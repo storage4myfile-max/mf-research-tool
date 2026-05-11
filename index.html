@@ -2049,8 +2049,7 @@ function onLoginSuccess() {
   initSearchListener();
   // Pre-fetch fund list in background so first search is instant
   if (allFunds.length === 0) {
-    fetch('https://api.mfapi.in/mf')
-      .then(r => r.json())
+    mfFetch('https://api.mfapi.in/mf')
       .then(data => { allFunds = data; console.log('Fund list loaded:', data.length, 'funds'); })
       .catch(e => console.warn('Fund list prefetch failed:', e));
   }
@@ -2089,7 +2088,6 @@ setTimeout(async () => {
     const saved = localStorage.getItem('mfr_session');
     if (saved) {
       const sess = JSON.parse(saved);
-      // Session expires after 30 days
       if (Date.now() - sess.savedAt < 30 * 86400000) {
         currentUser = { name: sess.name, userId: sess.userId, displayName: sess.displayName };
         onLoginSuccess();
@@ -2097,18 +2095,31 @@ setTimeout(async () => {
       }
     }
   } catch(e) {}
-  // Show login screen
   document.getElementById('loginScreen').style.display = 'flex';
-}, 300);
+}, 800);
 
 // ─── FIRESTORE SYNC (now user-scoped) ────────────────────
 // Watchlist ops — use currentUser.userId as scope
 
 // ─── MFAPI ───────────────────────────────────────────────
+const PROXY = 'https://api.allorigins.win/raw?url=';
+
+async function mfFetch(url) {
+  // Try direct first, fall back to proxy if CORS error
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Direct fetch failed');
+    return await r.json();
+  } catch(e) {
+    const r2 = await fetch(PROXY + encodeURIComponent(url));
+    if (!r2.ok) throw new Error('Proxy fetch also failed');
+    return await r2.json();
+  }
+}
+
 async function searchFunds(q) {
   if (allFunds.length === 0) {
-    const r = await fetch('https://api.mfapi.in/mf');
-    allFunds = await r.json();
+    allFunds = await mfFetch('https://api.mfapi.in/mf');
   }
   const ql = q.toLowerCase();
   return allFunds.filter(f => f.schemeName.toLowerCase().includes(ql)).slice(0, 30);
@@ -2116,8 +2127,7 @@ async function searchFunds(q) {
 
 async function getNav(schemeCode) {
   if (navCache[schemeCode]) return navCache[schemeCode];
-  const r = await fetch(`https://api.mfapi.in/mf/${schemeCode}`);
-  const data = await r.json();
+  const data = await mfFetch(`https://api.mfapi.in/mf/${schemeCode}`);
   navCache[schemeCode] = data;
   return data;
 }
@@ -2127,8 +2137,15 @@ let searchTimer;
 
 function initSearchListener() {
   const inp = document.getElementById('searchInput');
-  if (!inp) return;
-  inp.addEventListener('input', e => {
+  if (!inp) {
+    // Retry after short delay if DOM not ready
+    setTimeout(initSearchListener, 300);
+    return;
+  }
+  // Remove any existing listener to avoid duplicates
+  inp.replaceWith(inp.cloneNode(true));
+  const freshInp = document.getElementById('searchInput');
+  freshInp.addEventListener('input', e => {
     clearTimeout(searchTimer);
     const q = e.target.value.trim();
     const resEl = document.getElementById('searchResults');
@@ -3603,8 +3620,7 @@ window.loadAMCFundList = async function() {
   document.getElementById('amcLoadStatus').textContent = 'Loading funds...';
   document.getElementById('amcChecklist').innerHTML = `<div class="loading-wrap" style="padding:20px 0;"><div class="spinner"></div><span>Fetching fund list...</span></div>`;
   if (allFunds.length === 0) {
-    const r = await fetch('https://api.mfapi.in/mf');
-    allFunds = await r.json();
+    allFunds = await mfFetch('https://api.mfapi.in/mf');
   }
   // Exact match — fund name must contain the verified AMC string (case-insensitive)
   const matchLower = exactMatch.toLowerCase();
@@ -4188,8 +4204,7 @@ window.loadCategoryFunds = async function() {
   document.getElementById('catFundCount').textContent = 'Loading fund list...';
 
   if (allFunds.length === 0) {
-    const r = await fetch('https://api.mfapi.in/mf');
-    allFunds = await r.json();
+    allFunds = await mfFetch('https://api.mfapi.in/mf');
   }
 
   // Filter by plan type
@@ -4997,7 +5012,7 @@ window.buildCatHeatmap = async function() {
   const resultEl = document.getElementById('heatmapResult');
   resultEl.innerHTML = `<div class="loading-wrap"><div class="spinner"></div><span>Loading fund list...</span></div>`;
 
-  if (allFunds.length === 0) { const r=await fetch('https://api.mfapi.in/mf'); allFunds=await r.json(); }
+  if (allFunds.length === 0) { allFunds = await mfFetch('https://api.mfapi.in/mf'); }
   const keywords = HEATMAP_CAT_KEYWORDS[cat] || [cat];
   // Get Direct Growth funds only, max 30
   let funds = allFunds.filter(f => {
