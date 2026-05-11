@@ -32,8 +32,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js"></script>
@@ -1968,7 +1966,9 @@
 <div class="toast" id="toast"></div>
 
 <!-- FIREBASE + APP SCRIPT -->
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBmEEahl3TKd3CvEWpfsYzpk3_V-47xjjs",
@@ -1979,8 +1979,8 @@ const firebaseConfig = {
   appId: "1:246086857912:web:570889dd0479a5823cb04d"
 };
 
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 // ─── STATE ───────────────────────────────────────────────
 let watchlist = {};
@@ -2017,8 +2017,8 @@ window.attemptLogin = async function() {
 
   // Check allowlist in Firestore
   try {
-    const allowDoc = await db.collection('allowlist').doc(name).get();
-    if (!allowDoc.exists) {
+    const allowDoc = await getDoc(doc(db, 'allowlist', name));
+    if (!allowDoc.exists()) {
       errEl.textContent = '✕ Name not found. Contact VED Investment for access.';
       return;
     }
@@ -2045,11 +2045,20 @@ function onLoginSuccess() {
   if (badge) { badge.style.display = 'flex'; }
   const nameEl = document.getElementById('userBadgeName');
   if (nameEl) nameEl.textContent = '👤 ' + currentUser.displayName;
+  // Init search after login so DOM is ready
+  initSearchListener();
+  // Pre-fetch fund list in background so first search is instant
+  if (allFunds.length === 0) {
+    fetch('https://api.mfapi.in/mf')
+      .then(r => r.json())
+      .then(data => { allFunds = data; console.log('Fund list loaded:', data.length, 'funds'); })
+      .catch(e => console.warn('Fund list prefetch failed:', e));
+  }
 
   // Start Firestore watchlist sync for this user
   if (wlUnsubscribe) wlUnsubscribe();
-  const wlRef = db.collection('users').doc(currentUser.userId).collection('watchlist');
-  wlUnsubscribe = wlRef.onSnapshot((snap) => {
+  const wlRef = collection(db, 'users', currentUser.userId, 'watchlist');
+  wlUnsubscribe = onSnapshot(wlRef, (snap) => {
     watchlist = {};
     snap.forEach(d => { watchlist[d.id] = d.data(); });
     renderWatchlist();
@@ -2115,19 +2124,31 @@ async function getNav(schemeCode) {
 
 // ─── SEARCH ──────────────────────────────────────────────
 let searchTimer;
-document.getElementById('searchInput').addEventListener('input', e => {
-  clearTimeout(searchTimer);
-  const q = e.target.value.trim();
-  if (q.length < 2) { document.getElementById('searchResults').style.display = 'none'; return; }
-  searchTimer = setTimeout(async () => {
-    const results = await searchFunds(q);
-    renderSearchResults(results);
-  }, 300);
-});
+
+function initSearchListener() {
+  const inp = document.getElementById('searchInput');
+  if (!inp) return;
+  inp.addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    const q = e.target.value.trim();
+    const resEl = document.getElementById('searchResults');
+    if (q.length < 2) { if(resEl) resEl.style.display = 'none'; return; }
+    // Show loading indicator while fetching fund list first time
+    if (allFunds.length === 0 && resEl) {
+      resEl.innerHTML = '<div style="padding:12px;font-size:11px;font-family:var(--mono);color:var(--text3);">Loading fund list... please wait</div>';
+      resEl.style.display = 'block';
+    }
+    searchTimer = setTimeout(async () => {
+      const results = await searchFunds(q);
+      renderSearchResults(results);
+    }, 300);
+  });
+}
 
 document.addEventListener('click', e => {
   if (!e.target.closest('.search-input-wrap')) {
-    document.getElementById('searchResults').style.display = 'none';
+    const resEl = document.getElementById('searchResults');
+    if (resEl) resEl.style.display = 'none';
   }
 });
 
@@ -2148,14 +2169,14 @@ window.addToWatchlist = async function(code, name) {
   document.getElementById('searchResults').style.display = 'none';
   document.getElementById('searchInput').value = '';
   if (!currentUser) { showToast('Please sign in first', 'error'); return; }
-  await db.collection('users').doc(currentUser.userId).collection('watchlist').doc(String(code)).set({ schemeCode: code, schemeName: name, addedAt: Date.now() });
+  await setDoc(doc(db, 'users', currentUser.userId, 'watchlist', String(code)), { schemeCode: code, schemeName: name, addedAt: Date.now() });
   showToast(`Added: ${name.substring(0,50)}...`, 'success');
 }
 
 window.removeFromWatchlist = async function(code, e) {
   e.stopPropagation();
   if (!currentUser) return;
-  await db.collection('users').doc(currentUser.userId).collection('watchlist').doc(String(code)).delete();
+  await deleteDoc(doc(db, 'users', currentUser.userId, 'watchlist', String(code)));
   showToast('Removed from watchlist');
 }
 
