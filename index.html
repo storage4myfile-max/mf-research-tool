@@ -185,6 +185,11 @@
     overflow-y: auto;
     padding: 28px 32px;
     animation: fadeIn 0.2s ease;
+    height: 100%;
+  }
+
+  #fundContent {
+    min-height: 100%;
   }
 
   /* ── SEARCH ────────────────────────────────── */
@@ -992,13 +997,7 @@
     <!-- FUND PAGE -->
     <div class="page active" id="page-fund">
       <div id="fundContent">
-        <div id="homeScreen">
-          <!-- HOME DASHBOARD - rendered by renderHomeScreen() -->
-          <div class="loading-wrap" style="padding:40px;">
-            <div class="spinner"></div>
-            <span>Loading dashboard...</span>
-          </div>
-        </div>
+        <div id="homeScreen"></div>
       </div>
     </div>
 
@@ -1621,13 +1620,22 @@ let navCache = {};
 
 // ─── FIRESTORE SYNC ───────────────────────────────────────
 const wlRef = collection(db, 'watchlist');
+// Timeout: if Firebase doesn't connect in 5s, show offline
+const fbTimeout = setTimeout(() => {
+  const st = document.getElementById('syncText');
+  if (st && st.textContent === 'connecting...') {
+    st.textContent = 'offline';
+  }
+}, 5000);
 onSnapshot(wlRef, (snap) => {
+  clearTimeout(fbTimeout);
   watchlist = {};
   snap.forEach(d => { watchlist[d.id] = d.data(); });
   renderWatchlist();
   document.getElementById('syncDot').classList.add('live');
   document.getElementById('syncText').textContent = 'synced';
 }, () => {
+  clearTimeout(fbTimeout);
   document.getElementById('syncText').textContent = 'offline';
 });
 
@@ -1754,6 +1762,11 @@ function renderFundPage(data) {
   const navArr = navs.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) })).filter(n => !isNaN(n.nav)).reverse(); // oldest first
 
   const ptpReturns = calcPTPReturns(navArr);
+  // Reset SIP benchmark state for new fund
+  _fundSIPBenchCode = '';
+  _fundSIPBenchName = '';
+  _fundSIPBenchXIRRs = {};
+
   const sipData = calcSIPYearly(navArr);
   const rollingData = calcRolling(navArr);
   const riskData = calcRisk(navArr);
@@ -1856,6 +1869,7 @@ window.switchMetricTab = function(tab) {
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
   if (tab === 'chart') { renderNavChart('all'); }
+  if (tab === 'sip')   { setTimeout(initFundSIPBenchSearch, 50); }
 }
 
 // ─── POINT TO POINT RETURNS ──────────────────────────────
@@ -1892,37 +1906,54 @@ function calcPTPReturns(navArr) {
 }
 
 function renderPTPSection(ptpReturns, navArr) {
+  const latest = navArr[navArr.length-1];
+  const validReturns = ptpReturns.filter(p => p.cagr !== null);
+  const maxCagr = validReturns.length ? Math.max(...validReturns.map(p => Math.abs(p.cagr))) : 1;
+
   const cards = ptpReturns.map(p => {
-    if (p.cagr === null) return `<div class="return-card"><div class="return-period">${p.label}</div><div class="return-value neutral">—</div></div>`;
-    const cls = p.cagr > 0 ? 'positive' : p.cagr < 0 ? 'negative' : 'neutral';
-    const suffix = p.years >= 1 ? 'CAGR' : 'Abs';
-    return `
-      <div class="return-card">
+    if (p.cagr === null) return `
+      <div class="return-card" style="opacity:0.4;">
         <div class="return-period">${p.label}</div>
-        <div class="return-value ${cls}">${p.cagr.toFixed(1)}%</div>
-        <div class="return-abs">${suffix} · Abs: ${p.abs.toFixed(1)}%</div>
+        <div class="return-value neutral" style="font-size:20px;">—</div>
+        <div class="return-abs">No data</div>
+      </div>`;
+    const isPos = p.cagr >= 0;
+    const col = p.cagr > 20 ? 'var(--positive)' : p.cagr > 10 ? 'var(--accent)' : p.cagr > 0 ? 'var(--saffron)' : 'var(--negative)';
+    const barW = Math.min((Math.abs(p.cagr) / maxCagr) * 100, 100);
+    const suffix = p.years >= 1 ? 'CAGR' : 'Abs';
+    const mult = (1 + p.abs/100).toFixed(2);
+    return `
+      <div class="return-card" style="position:relative;overflow:hidden;">
+        <div style="position:absolute;bottom:0;left:0;width:${barW}%;height:3px;background:${col};border-radius:0 2px 0 0;opacity:0.6;"></div>
+        <div class="return-period">${p.label}</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:${col};line-height:1;margin-bottom:4px;">${isPos?'+':''}${p.cagr.toFixed(1)}%</div>
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);">${suffix} · ${mult}x</div>
       </div>`;
   }).join('');
 
   return `
-    <div class="section-title">Trailing Returns</div>
-    <div class="returns-grid">${cards}</div>
-    <div class="section-title" style="margin-top:24px;">Custom Period</div>
-    <div class="ptp-card">
-      <div class="input-row">
-        <div class="input-group">
-          <label class="input-label">From</label>
-          <input class="input-field" type="date" id="fundPtpFrom" style="width:160px;">
+    <div style="margin-bottom:24px;">
+      <div class="section-title">Trailing Returns</div>
+      <div class="returns-grid">${cards}</div>
+    </div>
+    <div style="margin-bottom:8px;">
+      <div class="section-title">Custom Period</div>
+      <div class="ptp-card" style="padding:18px 22px;">
+        <div class="input-row">
+          <div class="input-group">
+            <label class="input-label">From</label>
+            <input class="input-field" type="date" id="fundPtpFrom" style="width:160px;">
+          </div>
+          <div class="input-group">
+            <label class="input-label">To</label>
+            <input class="input-field" type="date" id="fundPtpTo" style="width:160px;">
+          </div>
+          <div class="input-group" style="justify-content:flex-end;">
+            <button class="btn btn-primary" onclick="calcCustomPTP()">Calculate</button>
+          </div>
         </div>
-        <div class="input-group">
-          <label class="input-label">To</label>
-          <input class="input-field" type="date" id="fundPtpTo" style="width:160px;">
-        </div>
-        <div class="input-group" style="justify-content:flex-end;">
-          <button class="btn btn-primary" onclick="calcCustomPTP()">Calculate</button>
-        </div>
+        <div id="ptpCustomResult"></div>
       </div>
-      <div id="ptpCustomResult"></div>
     </div>`;
 }
 
@@ -1942,15 +1973,151 @@ window.calcCustomPTP = function() {
   const invested = 100000;
   const worth = invested * (endNav.nav / startNav.nav);
   const cls = cagr > 0 ? 'positive' : 'negative';
+  const col = cagr > 20 ? 'var(--positive)' : cagr > 10 ? 'var(--accent)' : cagr > 0 ? 'var(--saffron)' : 'var(--negative)';
   document.getElementById('ptpCustomResult').innerHTML = `
-    <div class="ptp-result">
-      <div class="ptp-stat"><div class="ptp-stat-label">CAGR</div><div class="ptp-stat-val ${cls}">${cagr.toFixed(2)}%</div></div>
-      <div class="ptp-stat"><div class="ptp-stat-label">Abs Return</div><div class="ptp-stat-val ${cls}">${abs.toFixed(2)}%</div></div>
-      <div class="ptp-stat"><div class="ptp-stat-label">Period</div><div class="ptp-stat-val" style="font-size:16px;">${years.toFixed(1)}Y</div></div>
-      <div class="ptp-stat"><div class="ptp-stat-label">₹1L → Worth</div><div class="ptp-stat-val ${cls}">₹${(worth/100000).toFixed(2)}L</div></div>
-      <div class="ptp-stat"><div class="ptp-stat-label">Start NAV</div><div class="ptp-stat-val" style="font-size:16px;">₹${startNav.nav.toFixed(2)}</div></div>
-      <div class="ptp-stat"><div class="ptp-stat-label">End NAV</div><div class="ptp-stat-val" style="font-size:16px;">₹${endNav.nav.toFixed(2)}</div></div>
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${col};"></div>
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">CAGR</div>
+        <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:${col};line-height:1;">${cagr>=0?'+':''}${cagr.toFixed(2)}%</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">Abs Return</div>
+        <div style="font-size:20px;font-weight:600;font-family:var(--mono);color:${col};line-height:1;">${abs>=0?'+':''}${abs.toFixed(2)}%</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">Period</div>
+        <div style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--text);line-height:1;">${years.toFixed(1)}Y</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">₹1L → Value</div>
+        <div style="font-size:20px;font-weight:600;font-family:var(--mono);color:${col};line-height:1;">₹${(worth/100000).toFixed(2)}L</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">Start NAV</div>
+        <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--text2);line-height:1;">₹${startNav.nav.toFixed(2)}</div>
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:3px;">${startNav.date.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})}</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">End NAV</div>
+        <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--text2);line-height:1;">₹${endNav.nav.toFixed(2)}</div>
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:3px;">${endNav.date.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})}</div>
+      </div>
     </div>`;
+}
+
+// ─── FUND PAGE SIP BENCHMARK ─────────────────────────────
+let _fundSIPBenchCode = '';
+let _fundSIPBenchName = '';
+let _fundSIPBenchXIRRs = {}; // { '1Y': 12.3, '3Y': 14.2, ... }
+
+window._selectBenchPill = async function(idx) {
+  const PILLS = [
+    { label:'Nifty 50',        code:'120716' },
+    { label:'Nifty 500',       code:'147625' },
+    { label:'Nifty Next 50',   code:'143341' },
+    { label:'Midcap 150',      code:'147622' },
+    { label:'Smallcap 250',    code:'148519' },
+    { label:'LargeMidcap 250', code:'149339' },
+  ];
+  const pill = PILLS[idx];
+
+  // Highlight active pill
+  document.querySelectorAll('[id^="benchPill"]').forEach((el,i) => {
+    el.style.borderColor = i === idx ? 'var(--accent)' : 'var(--border2)';
+    el.style.color       = i === idx ? 'var(--accent)' : 'var(--text3)';
+    el.style.background  = i === idx ? 'rgba(232,170,46,0.08)' : 'transparent';
+  });
+
+  const sel = document.getElementById('fundSIPBenchSelected');
+  if (sel) sel.textContent = `⟳ loading ${pill.label}…`;
+
+  await window._selectFundSIPBench(pill.code, pill.label);
+};
+
+window._selectFundSIPBench = async function(code, name) {
+  _fundSIPBenchCode = code;
+  _fundSIPBenchName = name;
+  const inp = document.getElementById('fundSIPBenchInput');
+  const res = document.getElementById('fundSIPBenchResults');
+  const sel = document.getElementById('fundSIPBenchSelected');
+  if (inp) inp.value = name.substring(0, 50);
+  if (res) res.style.display = 'none';
+  if (sel) sel.textContent = '✓ ' + code;
+
+  // Compute benchmark SIP XIRRs
+  try {
+    sel.textContent = '⟳ loading...';
+    const bData = await getNav(code);
+    const bNavArr = bData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
+    const bSIPData = calcSIPYearly(bNavArr);
+    _fundSIPBenchXIRRs = {};
+    bSIPData.forEach(s => { _fundSIPBenchXIRRs[`${s.years}Y`] = s.xirr; });
+    sel.textContent = '✓ ' + code;
+    // Re-render SIP section with benchmark data
+    const sipEl = document.getElementById('metricContent-sip');
+    if (sipEl && selectedFund) {
+      const navData = navCache[selectedFund.schemeCode];
+      if (navData) {
+        const navArr2 = navData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
+        const sipData2 = calcSIPYearly(navArr2);
+        sipEl.innerHTML = renderSIPSection(sipData2);
+        initFundSIPBenchSearch();
+        // Restore the input
+        const inp2 = document.getElementById('fundSIPBenchInput');
+        if (inp2) inp2.value = _fundSIPBenchName.substring(0, 50);
+        const sel2 = document.getElementById('fundSIPBenchSelected');
+        if (sel2) sel2.textContent = '✓ ' + _fundSIPBenchCode;
+      }
+    }
+  } catch(e) {
+    if (sel) sel.textContent = '✗ failed';
+  }
+};
+
+window._clearFundSIPBench = function() {
+  _fundSIPBenchCode = '';
+  _fundSIPBenchName = '';
+  _fundSIPBenchXIRRs = {};
+  const inp = document.getElementById('fundSIPBenchInput');
+  const sel = document.getElementById('fundSIPBenchSelected');
+  if (inp) inp.value = '';
+  if (sel) sel.textContent = '';
+  // Re-render without benchmark
+  const sipEl = document.getElementById('metricContent-sip');
+  if (sipEl && selectedFund) {
+    const navData = navCache[selectedFund.schemeCode];
+    if (navData) {
+      const navArr2 = navData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
+      sipEl.innerHTML = renderSIPSection(calcSIPYearly(navArr2));
+      initFundSIPBenchSearch();
+    }
+  }
+};
+
+function initFundSIPBenchSearch() {
+  const inp = document.getElementById('fundSIPBenchInput');
+  const res = document.getElementById('fundSIPBenchResults');
+  if (!inp || !res) return;
+  let t;
+  inp.addEventListener('blur', () => setTimeout(() => { res.style.display = 'none'; }, 200));
+  inp.addEventListener('input', e => {
+    clearTimeout(t);
+    const q = e.target.value.trim();
+    if (q.length < 2) { res.style.display = 'none'; return; }
+    t = setTimeout(async () => {
+      const results = await searchFunds(q);
+      if (!results.length) { res.style.display = 'none'; return; }
+      res.innerHTML = results.slice(0, 7).map(f => `
+        <div onclick="window._selectFundSIPBench('${f.schemeCode}','${f.schemeName.replace(/'/g,"\\'")}')"
+          style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:11px;font-family:var(--mono);color:var(--text);transition:background 0.1s;"
+          onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
+          <div>${f.schemeName.substring(0,55)}</div>
+          <div style="font-size:9px;color:var(--text3);margin-top:1px;">${f.schemeCode}</div>
+        </div>`).join('');
+      res.style.display = 'block';
+    }, 280);
+  });
 }
 
 // ─── SIP RETURNS ─────────────────────────────────────────
@@ -1993,11 +2160,8 @@ function buildSIPCashflows(navArr, startDate, endDate, monthlyAmt) {
 function renderSIPSection(sipData) {
   if (!sipData.length) return '<div class="loading-wrap"><span>Insufficient data for SIP calculation</span></div>';
 
-  const maxXIRR = Math.max(...sipData.map(s => s.xirr || 0));
-  const maxGain  = Math.max(...sipData.map(s => {
-    const worth = s.invested * Math.pow(1 + (s.xirr||0)/100, s.years);
-    return worth - s.invested;
-  }));
+  const hasBench = _fundSIPBenchCode && Object.keys(_fundSIPBenchXIRRs).length > 0;
+  const maxXIRR  = Math.max(...sipData.map(s => s.xirr || 0));
 
   const fmtAmt = v => {
     const a = Math.abs(v);
@@ -2008,65 +2172,48 @@ function renderSIPSection(sipData) {
 
   const rows = sipData.map((s, i) => {
     const worth   = s.invested * Math.pow(1 + (s.xirr||0)/100, s.years);
-    const gain    = worth - s.invested;
     const multip  = worth / s.invested;
     const xirr    = s.xirr || 0;
     const barW    = maxXIRR > 0 ? Math.max(0, (xirr / maxXIRR) * 100) : 0;
     const xirrCol = xirr > 15 ? 'var(--positive)' : xirr > 8 ? 'var(--accent)' : xirr > 0 ? 'var(--saffron)' : 'var(--negative)';
-    const isTop   = xirr === maxXIRR && sipData.length > 1;
+
+    const key = `${s.years}Y`;
+    const bXIRR = hasBench ? (_fundSIPBenchXIRRs[key] ?? null) : null;
+    const alpha = bXIRR !== null ? xirr - bXIRR : null;
+    const alphaCol = alpha === null ? 'var(--text3)' : alpha > 0 ? 'var(--positive)' : 'var(--negative)';
 
     return `
     <div style="
       display:grid;
-      grid-template-columns: 52px 1fr 80px 90px 90px 72px;
+      grid-template-columns: 52px 1fr 80px 90px 90px 72px ${hasBench ? '72px 80px' : ''};
       align-items:center;
-      gap:0;
       padding: 11px 18px;
       border-bottom: 1px solid var(--border);
       transition: background 0.12s;
-      ${isTop ? 'background:rgba(45,212,160,0.04);' : ''}
-    " onmouseover="this.style.background='rgba(255,255,255,0.025)'" onmouseout="this.style.background='${isTop?'rgba(45,212,160,0.04)':'transparent'}'">
-
-      <!-- Period -->
+    " onmouseover="this.style.background='rgba(255,255,255,0.025)'" onmouseout="this.style.background='transparent'">
       <div style="font-family:var(--mono);font-size:11px;color:var(--text3);">${s.years}Y</div>
-
-      <!-- XIRR bar -->
       <div style="padding-right:16px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="flex:1;height:3px;background:var(--surface3);border-radius:2px;overflow:hidden;">
-            <div style="width:${barW}%;height:100%;background:${xirrCol};border-radius:2px;transition:width 0.4s;"></div>
+            <div style="width:${barW}%;height:100%;background:${xirrCol};border-radius:2px;"></div>
           </div>
         </div>
       </div>
-
-      <!-- XIRR -->
-      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${xirrCol};text-align:right;">
-        ${xirr.toFixed(2)}%
-      </div>
-
-      <!-- Invested -->
-      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:right;">
-        ₹${fmtAmt(s.invested)}
-      </div>
-
-      <!-- Est. Value -->
-      <div style="font-family:var(--mono);font-size:12px;color:var(--text);text-align:right;font-weight:600;">
-        ₹${fmtAmt(worth)}
-      </div>
-
-      <!-- Multiplier -->
-      <div style="font-family:var(--mono);font-size:10px;color:${gain>0?'var(--positive)':'var(--negative)'};text-align:right;">
-        ${multip.toFixed(2)}x
-      </div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${xirrCol};text-align:right;">${xirr.toFixed(2)}%</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:right;">₹${fmtAmt(s.invested)}</div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--text);text-align:right;font-weight:600;">₹${fmtAmt(worth)}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:${multip>=1?'var(--positive)':'var(--negative)'};text-align:right;">${multip.toFixed(2)}x</div>
+      ${hasBench ? `
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:right;">${bXIRR !== null ? bXIRR.toFixed(2)+'%' : '—'}</div>
+      <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:${alphaCol};text-align:right;">${alpha !== null ? (alpha>0?'+':'')+alpha.toFixed(2)+'%' : '—'}</div>
+      ` : ''}
     </div>`;
   }).join('');
 
-  // Header
   const header = `
     <div style="
       display:grid;
-      grid-template-columns: 52px 1fr 80px 90px 90px 72px;
-      gap:0;
+      grid-template-columns: 52px 1fr 80px 90px 90px 72px ${hasBench ? '72px 80px' : ''};
       padding: 9px 18px;
       background: var(--surface2);
       border-bottom: 1px solid var(--border);
@@ -2078,6 +2225,52 @@ function renderSIPSection(sipData) {
       <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Invested</div>
       <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Est. Value</div>
       <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Multiple</div>
+      ${hasBench ? `
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Bench XIRR</div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Alpha</div>
+      ` : ''}
+    </div>`;
+
+  // Benchmark search bar + quick-select pills
+  const BENCH_PILLS = [
+    { label: 'Nifty 50',            q: 'UTI Nifty 50 Index Fund Direct Growth',              match: n => n.includes('UTI') && n.includes('Nifty 50') && n.includes('Direct') && n.includes('Growth') && !n.includes('Next') },
+    { label: 'Nifty 500',           q: 'Motilal Oswal Nifty 500 Index Fund Direct Growth',   match: n => n.includes('Motilal') && n.includes('Nifty 500') && n.includes('Direct') && !n.includes('Multicap') && !n.includes('Momentum') },
+    { label: 'Nifty Next 50',       q: 'UTI Nifty Next 50 Index Fund Direct Growth',         match: n => n.includes('UTI') && n.includes('Next 50') && n.includes('Direct') },
+    { label: 'Midcap 150',          q: 'Motilal Oswal Nifty Midcap 150 Index Fund Direct',   match: n => n.includes('Motilal') && n.includes('Midcap 150') && n.includes('Direct') },
+    { label: 'Smallcap 250',        q: 'Nippon India Nifty Smallcap 250 Index Fund Direct',  match: n => n.includes('Nippon') && n.includes('Smallcap 250') && n.includes('Direct') },
+    { label: 'LargeMidcap 250',     q: 'Edelweiss Nifty LargeMidcap 250 Index Fund Direct',  match: n => n.includes('Edelweiss') && n.includes('LargeMidcap') && n.includes('Direct') },
+  ];
+
+  const pillsHTML = `
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;align-self:center;white-space:nowrap;">QUICK SELECT:</span>
+      ${BENCH_PILLS.map((p,i) => `
+        <button onclick="window._selectBenchPill(${i})"
+          id="benchPill${i}"
+          style="padding:3px 10px;border-radius:20px;font-family:var(--mono);font-size:10px;cursor:pointer;
+                 border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;"
+          onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+          onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text3)'">
+          ${p.label}
+        </button>`).join('')}
+    </div>`;
+
+  const benchBar = `
+    <div style="margin-bottom:16px;">
+      ${pillsHTML}
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;">Or search:</div>
+        <div style="position:relative;flex:1;min-width:220px;max-width:380px;">
+          <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:7px 11px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="fundSIPBenchInput" type="text" placeholder="Any fund as benchmark…" autocomplete="off"
+              style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:11px;font-family:var(--mono);" />
+            <button onclick="window._clearFundSIPBench()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;">✕</button>
+          </div>
+          <div id="fundSIPBenchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
+          <div id="fundSIPBenchSelected" style="font-size:9.5px;color:var(--accent);font-family:var(--mono);margin-top:3px;">${_fundSIPBenchCode ? '✓ '+_fundSIPBenchCode+' · '+_fundSIPBenchName.substring(0,40) : ''}</div>
+        </div>
+      </div>
     </div>`;
 
   return `
@@ -2087,16 +2280,16 @@ function renderSIPSection(sipData) {
           SIP RETURNS · ₹10,000/month · Ending today · 1st of month
         </div>
         <div style="font-size:9px;font-family:var(--mono);color:var(--text3);">
-          Best XIRR:
-          <span style="color:var(--positive);font-weight:700;">${maxXIRR.toFixed(2)}%</span>
+          Best XIRR: <span style="color:var(--positive);font-weight:700;">${maxXIRR.toFixed(2)}%</span>
           at ${sipData.find(s=>s.xirr===maxXIRR)?.years}Y
         </div>
       </div>
+      ${benchBar}
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
         ${header}${rows}
       </div>
       <div style="font-size:9.5px;color:var(--text3);font-family:var(--mono);margin-top:8px;padding:0 2px;">
-        * XIRR via Newton-Raphson on actual NAV cashflows · Bar shows relative XIRR magnitude · Multiple = Est. Value ÷ Invested
+        * XIRR via Newton-Raphson · Multiple = Est. Value ÷ Invested${hasBench ? ' · Alpha = Fund XIRR − Benchmark XIRR' : ''}
       </div>
     </div>`;
 }
@@ -2168,37 +2361,46 @@ function closestNavFast(navArr, targetMs, maxGapDays) {
 function renderRollingSection(rolling) {
   if (!rolling.length) return '<div class="loading-wrap"><span>Insufficient data for rolling returns</span></div>';
   const cards = rolling.map(r => {
-    const minCls = r.min < 0 ? 'negative' : 'positive';
-    const medCls = r.median < 0 ? 'negative' : 'positive';
-    const maxCls = r.max < 0 ? 'negative' : 'positive';
-    const barPct = Math.min(r.posPct, 100);
+    const medCol = r.median > 15 ? 'var(--positive)' : r.median > 8 ? 'var(--accent)' : r.median > 0 ? 'var(--saffron)' : 'var(--negative)';
+    const minCol = r.min >= 0 ? 'var(--positive)' : 'var(--negative)';
+    const maxCol = r.max >= 0 ? 'var(--positive)' : 'var(--negative)';
+    const barW   = Math.min(r.posPct, 100);
+    const barCol = r.posPct >= 75 ? 'var(--positive)' : r.posPct >= 50 ? 'var(--accent)' : 'var(--negative)';
     return `
-      <div class="rolling-card">
-        <div class="rolling-period">${r.years}Y Rolling · ${r.count} periods</div>
-        <div class="rolling-stats">
+      <div class="rolling-card" style="position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${medCol};opacity:0.6;"></div>
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;">
+          ${r.years}Y Rolling <span style="color:var(--text3);opacity:0.6;">· ${r.count} periods</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
           <div>
-            <div class="rolling-stat-label">Median</div>
-            <div class="rolling-stat-val ${medCls}">${r.median.toFixed(1)}%</div>
+            <div style="font-size:8px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Median</div>
+            <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:${medCol};line-height:1;">${r.median.toFixed(1)}%</div>
           </div>
           <div>
-            <div class="rolling-stat-label">Min</div>
-            <div class="rolling-stat-val ${minCls}">${r.min.toFixed(1)}%</div>
+            <div style="font-size:8px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Min</div>
+            <div style="font-size:14px;font-weight:600;font-family:var(--mono);color:${minCol};line-height:1;">${r.min.toFixed(1)}%</div>
           </div>
           <div>
-            <div class="rolling-stat-label">Max</div>
-            <div class="rolling-stat-val ${maxCls}">${r.max.toFixed(1)}%</div>
+            <div style="font-size:8px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Max</div>
+            <div style="font-size:14px;font-weight:600;font-family:var(--mono);color:${maxCol};line-height:1;">${r.max.toFixed(1)}%</div>
           </div>
         </div>
-        <div class="rolling-bar-wrap">
-          <div class="rolling-bar-fill" style="width:${barPct}%"></div>
+        <div style="height:3px;background:var(--surface3);border-radius:2px;overflow:hidden;margin-bottom:7px;">
+          <div style="width:${barW}%;height:100%;background:${barCol};border-radius:2px;transition:width 0.5s;"></div>
         </div>
-        <div class="rolling-pos-pct">Positive periods: <span>${r.posPct.toFixed(1)}%</span></div>
+        <div style="font-size:9.5px;font-family:var(--mono);color:var(--text3);">
+          Positive: <span style="color:${barCol};font-weight:600;">${r.posPct.toFixed(1)}%</span>
+          <span style="margin-left:8px;opacity:0.5;">of periods</span>
+        </div>
       </div>`;
   }).join('');
 
   return `
-    <div class="section-title">Rolling Returns (CAGR, daily rolling)</div>
-    <div class="rolling-grid">${cards}</div>`;
+    <div style="margin-bottom:8px;">
+      <div class="section-title">Rolling Returns · Daily CAGR</div>
+      <div class="rolling-grid">${cards}</div>
+    </div>`;
 }
 
 // ─── RISK METRICS ────────────────────────────────────────
@@ -2908,20 +3110,25 @@ window.calcSIP = async function() {
     ]);
     const tableRows = results.map((r,i)=>{
       if (!r.ok) return `<tr><td colspan="7" style="color:var(--danger);font-size:11px;">${r.name} — ${r.error}</td></tr>`;
-      const isBest = okR.length>1 && r.xirr===bestXirr;
+      const isBest  = okR.length>1 && r.xirr===bestXirr;
       const isWorst = okR.length>1 && r.xirr===worstXirr;
-      return `<tr style="${isBest?'background:rgba(0,255,157,0.05)':isWorst?'background:rgba(239,71,111,0.05)':''}">
-        <td style="text-align:left;white-space:normal;max-width:260px;">
-          <span style="margin-right:5px;">${isBest?'🥇':isWorst?'🔴':'#'+(i+1)}</span>
-          ${r.name.substring(0,55)}${r.name.length>55?'…':''}
-          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px;">${r.code}</div>
+      const xirrCol = r.xirr>15?'var(--positive)':r.xirr>8?'var(--accent)':r.xirr>0?'var(--saffron)':'var(--negative)';
+      const barW    = bestXirr>0 ? Math.max(0,(r.xirr/bestXirr)*100) : 0;
+      const fmtV    = v => { const a=Math.abs(v); return a>=10000000?`₹${(v/10000000).toFixed(2)}Cr`:a>=100000?`₹${(v/100000).toFixed(2)}L`:`₹${(v/1000).toFixed(1)}K`; };
+      return `<tr style="${isBest?'background:rgba(45,212,160,0.04)':isWorst?'background:rgba(240,92,120,0.04)':''}">
+        <td style="text-align:left;white-space:normal;max-width:240px;">
+          <div style="font-size:12px;color:var(--text);margin-bottom:2px;">${isBest?'🥇 ':isWorst?'🔴 ':''}${r.name.substring(0,52)}${r.name.length>52?'…':''}</div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:5px;">${r.code} · ${r.installments} instalments</div>
+          <div style="height:2px;background:var(--surface3);border-radius:2px;overflow:hidden;max-width:180px;">
+            <div style="width:${barW}%;height:100%;background:${xirrCol};border-radius:2px;"></div>
+          </div>
         </td>
-        <td class="${r.xirr>0?'xirr-pos':'xirr-neg'}" style="font-weight:700;">${r.xirr.toFixed(2)}%</td>
-        <td>₹${(r.invested/1000).toFixed(0)}K</td>
-        <td class="${r.finalVal>r.invested?'xirr-pos':'xirr-neg'}">₹${(r.finalVal/1000).toFixed(1)}K</td>
-        <td class="${r.gain>0?'xirr-pos':'xirr-neg'}">₹${(r.gain/1000).toFixed(1)}K</td>
-        <td class="${r.gain>0?'xirr-pos':'xirr-neg'}">${((r.gain/r.invested)*100).toFixed(1)}%</td>
-        ${bench?`<td class="${r.alpha>0?'xirr-pos':'xirr-neg'}">${r.alpha>0?'+':''}${r.alpha.toFixed(2)}%</td>`:''}
+        <td style="font-family:var(--mono);font-size:13px;font-weight:700;color:${xirrCol};">${r.xirr.toFixed(2)}%</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${fmtV(r.invested)}</td>
+        <td style="font-family:var(--mono);font-size:12px;font-weight:600;color:${r.finalVal>r.invested?'var(--positive)':'var(--negative)'};">${fmtV(r.finalVal)}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:${r.gain>0?'var(--positive)':'var(--negative)'};">${r.gain>0?'+':''}${fmtV(r.gain)}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:${r.gain>0?'var(--positive)':'var(--negative)'};">${((r.gain/r.invested)*100).toFixed(1)}%</td>
+        ${bench?`<td style="font-family:var(--mono);font-size:12px;font-weight:600;color:${r.alpha>0?'var(--positive)':'var(--negative)'};">${r.alpha>0?'+':''}${r.alpha.toFixed(2)}%</td>`:''}
       </tr>`;
     }).join('');
     const cols = [{label:'Fund',left:true,nosort:true},{label:'XIRR'},{label:'Invested'},{label:'Final Value'},{label:'Gain/Loss'},{label:'Abs Return'},...(bench?[{label:'Alpha'}]:[])];
@@ -2974,21 +3181,26 @@ window.calcPTPMulti = async function() {
     ]);
     const tableRows = results.map((r,i)=>{
       if (!r.ok) return `<tr><td colspan="8" style="color:var(--danger);font-size:11px;">${r.name} — ${r.error}</td></tr>`;
-      const isBest = okR.length>1 && r.cagr===bestCagr;
+      const isBest  = okR.length>1 && r.cagr===bestCagr;
       const isWorst = okR.length>1 && r.cagr===worstCagr;
-      return `<tr style="${isBest?'background:rgba(0,255,157,0.05)':isWorst?'background:rgba(239,71,111,0.05)':''}">
-        <td style="text-align:left;white-space:normal;max-width:260px;">
-          <span style="margin-right:5px;">${isBest?'🥇':isWorst?'🔴':'#'+(i+1)}</span>
-          ${r.name.substring(0,55)}${r.name.length>55?'…':''}
-          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px;">${r.code}</div>
+      const cagrCol = r.cagr>15?'var(--positive)':r.cagr>8?'var(--accent)':r.cagr>0?'var(--saffron)':'var(--negative)';
+      const barW    = bestCagr>0 ? Math.max(0,(r.cagr/bestCagr)*100) : 0;
+      const fmtV    = v => { const a=Math.abs(v); return a>=10000000?`₹${(v/10000000).toFixed(2)}Cr`:a>=100000?`₹${(v/100000).toFixed(2)}L`:`₹${(v/1000).toFixed(1)}K`; };
+      return `<tr style="${isBest?'background:rgba(45,212,160,0.04)':isWorst?'background:rgba(240,92,120,0.04)':''}">
+        <td style="text-align:left;white-space:normal;max-width:240px;">
+          <div style="font-size:12px;color:var(--text);margin-bottom:2px;">${isBest?'🥇 ':isWorst?'🔴 ':''}${r.name.substring(0,52)}${r.name.length>52?'…':''}</div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:5px;">${r.code} · ${r.years.toFixed(1)}Y</div>
+          <div style="height:2px;background:var(--surface3);border-radius:2px;overflow:hidden;max-width:180px;">
+            <div style="width:${barW}%;height:100%;background:${cagrCol};border-radius:2px;"></div>
+          </div>
         </td>
-        <td class="${r.cagr>0?'xirr-pos':'xirr-neg'}" style="font-weight:700;">${r.cagr.toFixed(2)}%</td>
-        <td class="${r.abs>0?'xirr-pos':'xirr-neg'}">${r.abs.toFixed(2)}%</td>
-        <td>₹${(lumpsum/1000).toFixed(0)}K</td>
-        <td class="${r.worth>lumpsum?'xirr-pos':'xirr-neg'}">₹${(r.worth/1000).toFixed(1)}K</td>
-        <td class="${r.gain>0?'xirr-pos':'xirr-neg'}">₹${(r.gain/1000).toFixed(1)}K</td>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">₹${r.startNav.toFixed(2)} → ₹${r.endNav.toFixed(2)}</td>
-        ${bench?`<td class="${r.alpha>0?'xirr-pos':'xirr-neg'}">${r.alpha>0?'+':''}${r.alpha.toFixed(2)}%</td>`:''}
+        <td style="font-family:var(--mono);font-size:13px;font-weight:700;color:${cagrCol};">${r.cagr.toFixed(2)}%</td>
+        <td style="font-family:var(--mono);font-size:11px;color:${r.abs>0?'var(--positive)':'var(--negative)'};">${r.abs.toFixed(2)}%</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${fmtV(lumpsum)}</td>
+        <td style="font-family:var(--mono);font-size:12px;font-weight:600;color:${r.worth>lumpsum?'var(--positive)':'var(--negative)'};">${fmtV(r.worth)}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:${r.gain>0?'var(--positive)':'var(--negative)'};">${r.gain>0?'+':''}${fmtV(r.gain)}</td>
+        <td style="font-family:var(--mono);font-size:10px;color:var(--text3);">₹${r.startNav.toFixed(2)} → ₹${r.endNav.toFixed(2)}</td>
+        ${bench?`<td style="font-family:var(--mono);font-size:12px;font-weight:600;color:${r.alpha>0?'var(--positive)':'var(--negative)'};">${r.alpha>0?'+':''}${r.alpha.toFixed(2)}%</td>`:''}
       </tr>`;
     }).join('');
     const cols = [{label:'Fund',left:true,nosort:true},{label:'CAGR'},{label:'Abs Return'},{label:'Invested'},{label:'Final Value'},{label:'Gain/Loss'},{label:'NAV Range',nosort:true},...(bench?[{label:'Alpha'}]:[])];
@@ -3877,58 +4089,54 @@ window.calcStepUpSIP = async function() {
     const okR = results.filter(r=>r.ok);
     const bestXIRR = okR.length ? Math.max(...okR.map(r=>r.stepXIRR)) : 0;
 
-    // Summary
-    const summaryHTML = `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
-      <div class="calc-box" style="flex:1;min-width:150px;">
-        <div class="calc-box-title">Initial SIP</div>
-        <div class="calc-big" style="font-size:18px;color:var(--text);">₹${initialAmt.toLocaleString('en-IN')}/mo</div>
-        <div class="calc-sub">+${stepUpPct}% every year · ${startStr} → ${endStr}</div>
-      </div>
-      ${stepBench ? `
-      <div class="calc-box" style="flex:1;min-width:150px;">
-        <div class="calc-box-title">Benchmark Step-Up XIRR</div>
-        <div class="calc-big" style="font-size:18px;color:var(--text2);">${stepBench.xirr.toFixed(2)}%</div>
-        <div class="calc-sub">${flatBench?.name?.substring(0,35)||''} · Invested ₹${(stepBench.invested/1000).toFixed(0)}K</div>
-      </div>` : ''}
-      <div class="calc-box" style="flex:1;min-width:150px;">
-        <div class="calc-box-title">Best Step-Up XIRR 🥇</div>
-        <div class="calc-big xirr-pos" style="font-size:18px;">${bestXIRR.toFixed(2)}%</div>
-        <div class="calc-sub">${okR.find(r=>r.stepXIRR===bestXIRR)?.name?.substring(0,35)||''}</div>
-      </div>
-    </div>`;
+    const fmtV = v => { const a=Math.abs(v); return a>=10000000?`₹${(v/10000000).toFixed(2)}Cr`:a>=100000?`₹${(v/100000).toFixed(2)}L`:`₹${(v/1000).toFixed(1)}K`; };
+
+    // Summary boxes
+    const summaryHTML = summaryBoxes([
+      { label:'Initial SIP', value:`₹${initialAmt.toLocaleString('en-IN')}/mo`, sub:`+${stepUpPct}% yearly · ${startStr} → ${endStr}`, color:'var(--text)' },
+      ...(stepBench?[{ label:'Benchmark Step-Up XIRR', value:`${stepBench.xirr.toFixed(2)}%`, sub:(flatBench?.name||'').substring(0,35), color:'var(--text2)' }]:[]),
+      ...(okR.length?[{ label:'Best Step-Up XIRR 🥇', value:`${bestXIRR.toFixed(2)}%`, sub:okR.find(r=>r.stepXIRR===bestXIRR)?.name?.substring(0,35)||'', color:'var(--positive)' }]:[]),
+      ...(okR.length?[{ label:'Extra Corpus (best)', value:fmtV(okR.find(r=>r.stepXIRR===bestXIRR)?.extraCorpus||0), sub:'Step-Up minus flat SIP value', color:'var(--accent)' }]:[]),
+    ]);
 
     const tableRows = results.map((r,i) => {
-      if (!r.ok) return `<tr><td colspan="8" style="color:var(--danger);font-size:11px;">${r.name} — ${r.error}</td></tr>`;
+      if (!r.ok) return `<tr><td colspan="9" style="color:var(--danger);font-size:11px;">${r.name} — ${r.error}</td></tr>`;
       const isBest = okR.length>1 && r.stepXIRR===bestXIRR;
-      const extraCls = r.extraCorpus > 0 ? 'xirr-pos' : 'xirr-neg';
-      return `<tr style="${isBest?'background:rgba(0,255,157,0.05)':''}">
+      const stepCol = r.stepXIRR>15?'var(--positive)':r.stepXIRR>8?'var(--accent)':r.stepXIRR>0?'var(--saffron)':'var(--negative)';
+      const flatCol = r.flatXIRR>15?'var(--positive)':r.flatXIRR>8?'var(--accent)':r.flatXIRR>0?'var(--saffron)':'var(--negative)';
+      const barW = bestXIRR>0 ? Math.max(0,(r.stepXIRR/bestXIRR)*100) : 0;
+      const uplift = r.stepXIRR - r.flatXIRR;
+      return `<tr style="${isBest?'background:rgba(45,212,160,0.04)':''}">
         <td style="text-align:left;white-space:normal;max-width:220px;">
-          ${isBest?'🥇 ':''}${r.name.substring(0,50)}${r.name.length>50?'…':''}
-          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);">${r.code}</div>
+          <div style="font-size:12px;color:var(--text);margin-bottom:2px;">${isBest?'🥇 ':''}${r.name.substring(0,52)}${r.name.length>52?'…':''}</div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:5px;">${r.code} · ${r.installments} instalments</div>
+          <div style="height:2px;background:var(--surface3);border-radius:2px;overflow:hidden;max-width:160px;">
+            <div style="width:${barW}%;height:100%;background:${stepCol};border-radius:2px;"></div>
+          </div>
         </td>
-        <td class="${r.flatXIRR>0?'xirr-pos':'xirr-neg'}">${r.flatXIRR.toFixed(2)}%</td>
-        <td>₹${(r.flatInvested/1000).toFixed(0)}K</td>
-        <td class="${r.flatFinal>r.flatInvested?'xirr-pos':'xirr-neg'}">₹${(r.flatFinal/1000).toFixed(1)}K</td>
-        <td class="${r.stepXIRR>0?'xirr-pos':'xirr-neg'}" style="font-weight:700;">${r.stepXIRR.toFixed(2)}%</td>
-        <td>₹${(r.stepInvested/1000).toFixed(0)}K</td>
-        <td class="${r.stepFinal>r.stepInvested?'xirr-pos':'xirr-neg'}">₹${(r.stepFinal/1000).toFixed(1)}K</td>
-        <td class="${extraCls}">₹${(r.extraCorpus/1000).toFixed(1)}K</td>
-        ${stepBench?`<td class="${r.alphaVsBench>0?'xirr-pos':'xirr-neg'}">${r.alphaVsBench>0?'+':''}${r.alphaVsBench?.toFixed(2)||'—'}%</td>`:''}
+        <td style="font-family:var(--mono);font-size:12px;color:${flatCol};">${r.flatXIRR.toFixed(2)}%</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${fmtV(r.flatInvested)}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:${r.flatFinal>r.flatInvested?'var(--positive)':'var(--negative)'};">${fmtV(r.flatFinal)}</td>
+        <td style="font-family:var(--mono);font-size:13px;font-weight:700;color:${stepCol};">${r.stepXIRR.toFixed(2)}%</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${fmtV(r.stepInvested)}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:${r.stepFinal>r.stepInvested?'var(--positive)':'var(--negative)'};">${fmtV(r.stepFinal)}</td>
+        <td style="font-family:var(--mono);font-size:12px;font-weight:600;color:${r.extraCorpus>0?'var(--positive)':'var(--negative)'};">${fmtV(r.extraCorpus)}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:${uplift>0?'var(--positive)':'var(--negative)'};">${uplift>0?'+':''}${uplift.toFixed(2)}%</td>
+        ${stepBench?`<td style="font-family:var(--mono);font-size:12px;color:${r.alphaVsBench>0?'var(--positive)':'var(--negative)'};">${r.alphaVsBench>0?'+':''}${r.alphaVsBench?.toFixed(2)||'—'}%</td>`:''}
       </tr>`;
     }).join('');
 
     const stepTid = 'stepup_'+Date.now();
-    const cols = ['Fund','Flat XIRR','Flat Invested','Flat Value','Step-Up XIRR','Step Invested','Step Value','Extra Corpus',...(stepBench?['Alpha']:[])];
-    const header = cols.map((c,i)=>i===0?`<th style="text-align:left;">${c}</th>`:`<th onclick="sortGenericTable('${stepTid}',${i})" style="cursor:pointer;user-select:none;" data-col="${i}">${c} <span style="opacity:0.4;font-size:9px;">⇅</span></th>`).join('');
+    const cols = [
+      {label:'Fund',left:true,nosort:true},
+      {label:'Flat XIRR'},{label:'Flat Invested'},{label:'Flat Value'},
+      {label:'Step-Up XIRR'},{label:'Step Invested'},{label:'Step Value'},
+      {label:'Extra Corpus'},{label:'XIRR Uplift'},
+      ...(stepBench?[{label:'Alpha'}]:[])
+    ];
 
-    resultEl.innerHTML = summaryHTML + `
-      <div class="compare-table-wrap">
-      <div class="export-bar"><span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span><button class="btn-export btn-export-csv" onclick="exportTableCSV('${stepTid}','StepUp_SIP')">⬇ CSV</button><button class="btn-export btn-export-xlsx" onclick="exportTableXLSX('${stepTid}','StepUp_SIP')">⬇ Excel</button></div><div class="compare-table-wrap"><table class="compare-table" style="min-width:700px;" id="${stepTid}">
-          <thead><tr>${header}</tr></thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
-      <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:8px;">* Step-up applied on 1st of Jan each year · XIRR via Newton-Raphson · Extra Corpus = Step-Up Final Value minus Flat Final Value</div>`;
+    resultEl.innerHTML = summaryHTML + resultsTable(cols, tableRows,
+      `* Step-up +${stepUpPct}% applied on 1st Jan each year · Extra Corpus = Step-Up Value − Flat Value · XIRR Uplift = Step-Up XIRR − Flat XIRR`);
 
   } catch(e) { resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:12px;padding:12px;">${e.message}</div>`; }
 }
@@ -4411,65 +4619,107 @@ function renderCatTable() {
   });
 
   function heatColor(v, max, min) {
-    if (v === null || v === undefined) return 'transparent';
+    if (v === null || v === undefined || !isFinite(v)) return 'var(--surface2)';
     if (v >= 0) {
-      const pct = max>0 ? Math.min(v/max,1) : 0;
-      return `rgba(0,255,157,${0.15+pct*0.75})`;
+      const pct = max > 0 ? Math.min(v / max, 1) : 0;
+      const alpha = 0.12 + pct * 0.7;
+      return `rgba(45,212,160,${alpha.toFixed(2)})`;
     } else {
-      const pct = min<0 ? Math.min(v/min,1) : 0;
-      return `rgba(239,71,111,${0.15+pct*0.75})`;
+      const pct = min < 0 ? Math.min(Math.abs(v) / Math.abs(min), 1) : 0;
+      const alpha = 0.12 + pct * 0.7;
+      return `rgba(240,92,120,${alpha.toFixed(2)})`;
     }
+  }
+
+  function textColor(v) {
+    if (v === null || v === undefined || !isFinite(v)) return 'var(--text3)';
+    return v >= 0 ? 'var(--positive)' : 'var(--negative)';
   }
 
   const headerCols = _catPeriods.map(p=>{
     const isActive = p.label === _catSortCol;
     const arrow = isActive ? (_catSortDir === -1 ? ' ↓' : ' ↑') : '';
-    return `<th onclick="sortCatTable('${p.label}')" style="cursor:pointer;user-select:none;${isActive?'color:var(--accent);':''}">${p.label}${arrow}</th>`;
+    return `<th onclick="sortCatTable('${p.label}')" style="cursor:pointer;user-select:none;white-space:nowrap;${isActive?'color:var(--accent);':''}">${p.label}${arrow}</th>`;
   }).join('');
 
   const tableRows = rows.filter(r=>r.ok).map((r,i)=>{
     const cols = _catPeriods.map(p=>{
-      const v = r.ptpMap[p.label];
-      const bg = heatColor(v, maxByPeriod[p.label], minByPeriod[p.label]);
-      return `<td style="background:${bg};font-weight:600;text-align:right;">${v!=null?v.toFixed(2)+'%':'—'}</td>`;
+      const v   = r.ptpMap[p.label];
+      const bg  = heatColor(v, maxByPeriod[p.label], minByPeriod[p.label]);
+      const col = textColor(v);
+      return `<td style="background:${bg};text-align:right;padding:8px 10px;">
+        <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${col};">${v!=null&&isFinite(v)?v.toFixed(2)+'%':'—'}</span>
+      </td>`;
     }).join('');
     const navDateStr = r.latestDate ? r.latestDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}) : '';
+    // Compute a simple rank score (average of available returns)
+    const vals = _catPeriods.map(p=>r.ptpMap[p.label]).filter(v=>v!=null&&isFinite(v));
+    const avgReturn = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
     return `<tr>
-      <td style="text-align:center;font-family:var(--mono);color:var(--text3);font-size:11px;">${i+1}</td>
-      <td style="text-align:left;white-space:normal;max-width:260px;">
-        ${r.name.substring(0,58)}${r.name.length>58?'…':''}
-        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px;">${r.code} · NAV as on ${navDateStr}</div>
+      <td style="text-align:center;font-family:var(--mono);font-size:11px;color:var(--text3);padding:8px 6px;">${i+1}</td>
+      <td style="text-align:left;padding:10px 12px;white-space:normal;min-width:220px;">
+        <div style="font-size:12px;color:var(--text);line-height:1.35;margin-bottom:3px;">${r.name.substring(0,56)}${r.name.length>56?'…':''}</div>
+        <div style="font-size:9.5px;color:var(--text3);font-family:var(--mono);">${r.code} · ${navDateStr}</div>
       </td>
+      ${avgReturn!==null?`<td style="text-align:right;padding:8px 10px;">
+        <span style="font-family:var(--mono);font-size:10px;color:${avgReturn>0?'var(--accent)':'var(--negative)'};font-weight:600;">${avgReturn.toFixed(1)}%</span>
+        <div style="font-size:8px;color:var(--text3);font-family:var(--mono);">avg</div>
+      </td>`:`<td></td>`}
       ${cols}
     </tr>`;
   }).join('');
 
   const activeRows = _catRows.filter(r=>r.ok);
-  const staleRows = _catRows.filter(r=>r.stale);
+  const staleRows  = _catRows.filter(r=>r.stale);
   const failedRows = _catRows.filter(r=>!r.ok && !r.stale);
+
   resultEl.innerHTML = `
-    <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
-      <span>${activeRows.length} active funds · Click any column to sort · Sorted by <span style="color:var(--accent);">${_catSortCol}</span> ${_catSortDir===-1?'↓':'↑'}</span>
-      ${staleRows.length ? `<span style="color:var(--warn);">⚠ ${staleRows.length} defunct/merged funds excluded (NAV >90 days old)</span>` : ''}
-      ${failedRows.length ? `<span style="color:var(--danger);">✕ ${failedRows.length} failed to load</span>` : ''}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">
+          <span style="color:var(--text);">${activeRows.length}</span> active funds
+        </span>
+        ${staleRows.length?`<span style="font-size:10px;font-family:var(--mono);color:var(--warn);">⚠ ${staleRows.length} defunct excluded</span>`:''}
+        ${failedRows.length?`<span style="font-size:10px;font-family:var(--mono);color:var(--danger);">✕ ${failedRows.length} failed</span>`:''}
+        <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">Sort: <span style="color:var(--accent);">${_catSortCol}</span> ${_catSortDir===-1?'↓':'↑'}</span>
+      </div>
+      <div class="export-bar" style="margin:0;">
+        <button class="btn-export csv" onclick="exportTableCSV('catResultTable','Category_Scanner')">⬇ CSV</button>
+        <button class="btn-export xl"  onclick="exportTableXLSX('catResultTable','Category_Scanner')">⬇ Excel</button>
+      </div>
     </div>
-    <div class="export-bar">
-      <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
-      <button class="btn-export btn-export-csv"  onclick="exportTableCSV('catResultTable','Category_Scanner')">⬇ CSV</button>
-      <button class="btn-export btn-export-xlsx" onclick="exportTableXLSX('catResultTable','Category_Scanner')">⬇ Excel</button>
+
+    <!-- Colour legend -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;">COLOUR SCALE:</span>
+      ${[0.15,0.4,0.7,0.85].map((a,i)=>`
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:20px;height:10px;border-radius:2px;background:rgba(45,212,160,${a});"></div>
+          <span style="font-size:9px;font-family:var(--mono);color:var(--text3);">${['Low','Mid','High','Best'][i]}</span>
+        </div>`).join('')}
+      <div style="width:1px;height:12px;background:var(--border);"></div>
+      ${[0.15,0.85].map((a,i)=>`
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:20px;height:10px;border-radius:2px;background:rgba(240,92,120,${a});"></div>
+          <span style="font-size:9px;font-family:var(--mono);color:var(--text3);">${['Low −','High −'][i]}</span>
+        </div>`).join('')}
     </div>
+
     <div class="compare-table-wrap">
       <table class="compare-table" style="min-width:900px;" id="catResultTable">
-        <thead><tr>
-          <th style="width:36px;text-align:center;">#</th>
-          <th style="text-align:left;cursor:pointer;" onclick="sortCatTable('name')">Fund</th>
-          ${headerCols}
-        </tr></thead>
+        <thead>
+          <tr>
+            <th style="width:32px;text-align:center;">#</th>
+            <th style="text-align:left;min-width:220px;cursor:pointer;" onclick="sortCatTable('name')">Fund</th>
+            <th style="white-space:nowrap;">Avg Ret</th>
+            ${headerCols}
+          </tr>
+        </thead>
         <tbody>${tableRows}</tbody>
       </table>
     </div>
-    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:8px;">
-      * CAGR for periods ≥1Y / Abs return for &lt;1Y / SI = Since Inception / Returns show 2 decimal places
+    <div style="font-size:9.5px;color:var(--text3);font-family:var(--mono);margin-top:8px;">
+      * CAGR for periods ≥1Y · Abs return for <1Y · SI = Since Inception · Avg Ret = simple average across all periods · Darker = stronger return
     </div>`;
 }
 
@@ -4819,56 +5069,108 @@ window.calcGoal = function() {
   const fmt = v => v >= 10000000 ? `₹${(v/10000000).toFixed(2)}Cr` : v >= 100000 ? `₹${(v/100000).toFixed(2)}L` : `₹${Math.round(v).toLocaleString('en-IN')}`;
 
   resultEl.innerHTML = `
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
-      <div class="risk-card" style="flex:1;min-width:150px;">
-        <div class="risk-label">Target Corpus</div>
-        <div class="risk-val" style="color:var(--accent);">${fmt(corpus)}</div>
-        <div class="risk-vs">in ${years} years at ${(ret*100).toFixed(1)}% p.a.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:20px;">
+
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--saffron));"></div>
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">Target Corpus</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent);line-height:1;margin-bottom:5px;">${fmt(corpus)}</div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);">in ${years}Y · at ${(ret*100).toFixed(1)}% p.a.</div>
       </div>
-      <div class="risk-card" style="flex:1;min-width:150px;">
-        <div class="risk-label">Flat SIP Required</div>
-        <div class="risk-val" style="color:var(--accent2);">${fmt(flatSIP)}<span style="font-size:14px;">/mo</span></div>
-        <div class="risk-vs">constant every month</div>
+
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">Flat SIP Required</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--positive);line-height:1;margin-bottom:5px;">${fmt(flatSIP)}<span style="font-size:12px;font-weight:400;">/mo</span></div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);">constant every month</div>
       </div>
-      <div class="risk-card" style="flex:1;min-width:150px;">
-        <div class="risk-label">Step-Up SIP (${(stepUp*100).toFixed(0)}%/yr)</div>
-        <div class="risk-val" style="color:var(--accent2);">${fmt(stepSIP)}<span style="font-size:14px;">/mo</span></div>
-        <div class="risk-vs">starting SIP · grows ${(stepUp*100).toFixed(0)}% yearly</div>
+
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">Step-Up SIP (${(stepUp*100).toFixed(0)}%/yr)</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--positive);line-height:1;margin-bottom:5px;">${fmt(stepSIP)}<span style="font-size:12px;font-weight:400;">/mo</span></div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);">starting SIP · grows ${(stepUp*100).toFixed(0)}% yearly</div>
       </div>
-      <div class="risk-card" style="flex:1;min-width:150px;">
-        <div class="risk-label">Lump Sum Required</div>
-        <div class="risk-val" style="color:var(--warn);">${fmt(lumpRequired)}</div>
-        <div class="risk-vs">invested today only</div>
+
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">Lump Sum Required</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--warn);line-height:1;margin-bottom:5px;">${fmt(lumpRequired)}</div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);">invested today only</div>
       </div>
-      ${existing>0?`<div class="risk-card" style="flex:1;min-width:150px;">
-        <div class="risk-label">Existing Savings FV</div>
-        <div class="risk-val" style="color:var(--text2);">${fmt(fvExisting)}</div>
-        <div class="risk-vs">future value of ₹${fmt(existing)}</div>
+
+      ${existing>0?`
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">Existing Savings FV</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--text2);line-height:1;margin-bottom:5px;">${fmt(fvExisting)}</div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);">future value of ${fmt(existing)}</div>
       </div>`:''}
+
+    </div>
+
+    <!-- Progress bar: SIP total vs wealth gain -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;margin-bottom:4px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;">Corpus Breakdown — Flat SIP</div>
+        <div style="font-size:10px;font-family:var(--mono);color:var(--text3);">${fmt(flatSIP*n)} invested · ${fmt(corpus - flatSIP*n)} wealth gain</div>
+      </div>
+      <div style="height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;">
+        ${(() => {
+          const totalInvested = flatSIP * n;
+          const pct = Math.min((totalInvested / corpus) * 100, 100);
+          return `<div style="display:flex;height:100%;">
+            <div style="width:${pct}%;background:var(--info);border-radius:4px 0 0 4px;"></div>
+            <div style="flex:1;background:var(--positive);border-radius:0 4px 4px 0;"></div>
+          </div>`;
+        })()}
+      </div>
+      <div style="display:flex;gap:16px;margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--text3);">
+          <div style="width:8px;height:8px;border-radius:2px;background:var(--info);"></div>Total Invested
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--text3);">
+          <div style="width:8px;height:8px;border-radius:2px;background:var(--positive);"></div>Wealth Gain
+        </div>
+      </div>
     </div>`;
 
   // Scenario table — different return rates
   const rates = [6,8,10,12,14,16,18,20];
+  const targetRate = Math.round(ret*100);
   const scRows = rates.map(r => {
-    const mr2 = r/100/12;
+    const mr2  = r/100/12;
     const fSIP = remainingCorpus>0&&mr2>0 ? remainingCorpus*mr2/(Math.pow(1+mr2,n)-1) : remainingCorpus/n;
     const lump2 = remainingCorpus/Math.pow(1+r/100,years);
-    const cls = r==Math.round(ret*100)?'style="background:rgba(0,212,255,0.08);"':'';
-    return `<tr ${cls}>
-      <td style="font-family:var(--mono);text-align:center;font-weight:${r==Math.round(ret*100)?700:400};color:${r==Math.round(ret*100)?'var(--accent)':'var(--text2)'};">${r}%</td>
-      <td class="${fSIP<flatSIP?'xirr-pos':''}">${fmt(fSIP)}/mo</td>
-      <td>${fmt(lump2)}</td>
-      <td style="color:var(--text3);">${fmt(fSIP*n)}</td>
-      <td style="color:var(--accent2);">${fmt(corpus-fSIP*n)}</td>
+    const totalInv = fSIP*n;
+    const wealthGain = corpus - totalInv;
+    const isTarget = r === targetRate;
+    const rCol = r>=14?'var(--positive)':r>=10?'var(--accent)':r>=8?'var(--saffron)':'var(--negative)';
+    return `<tr style="${isTarget?'background:rgba(232,170,46,0.07);':''}">
+      <td style="text-align:center;">
+        <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:${rCol};">${r}%</span>
+        ${isTarget?'<span style="font-size:9px;font-family:var(--mono);color:var(--accent);margin-left:4px;">← you</span>':''}
+      </td>
+      <td style="font-family:var(--mono);font-size:12px;font-weight:600;color:${fSIP<flatSIP?'var(--positive)':'var(--text)'};">${fmt(fSIP)}<span style="font-size:10px;font-weight:400;color:var(--text3);">/mo</span></td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${fmt(lump2)}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${fmt(totalInv)}</td>
+      <td style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--positive);">${fmt(wealthGain)}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${(wealthGain/totalInv*100).toFixed(0)}%</td>
     </tr>`;
   }).join('');
-  scenarioEl.innerHTML = `<div class="compare-table-wrap"><table class="compare-table" style="min-width:560px;">
-    <thead><tr>
-      <th>Return %</th><th>Flat SIP Needed</th><th>Lump Sum Needed</th>
-      <th>Total Invested</th><th>Wealth Gain</th>
-    </tr></thead>
-    <tbody>${scRows}</tbody></table></div>
-    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:8px;">* Highlighted row = your selected return rate / Wealth Gain = Corpus minus Total Invested</div>`;
+  scenarioEl.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:auto;">
+      <table class="compare-table" style="min-width:580px;">
+        <thead>
+          <tr>
+            <th style="text-align:center;">Return</th>
+            <th>Flat SIP Needed</th>
+            <th>Lump Sum</th>
+            <th>Total Invested</th>
+            <th>Wealth Gain</th>
+            <th>Gain Ratio</th>
+          </tr>
+        </thead>
+        <tbody>${scRows}</tbody>
+      </table>
+    </div>
+    <div style="font-size:9.5px;color:var(--text3);font-family:var(--mono);margin-top:8px;">* Wealth Gain = Target Corpus − Total Invested (flat SIP) · Gain Ratio = Wealth Gain ÷ Total Invested</div>`;
 }
 
 // ─── OVERLAP ANALYZER ────────────────────────────────────
@@ -5248,7 +5550,7 @@ window.buildScorecard = async function() {
       </table>
     </div>
     <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:8px;">
-      * Trailing: CAGR for ≥1Y, Abs for &lt;1Y · Alpha = fund return minus benchmark return for same period · Risk: Rf=6.5% · Rolling: median CAGR · Fund column is sticky
+      * Trailing: CAGR for ≥1Y, Abs for <1Y · Alpha = fund return minus benchmark return for same period · Risk: Rf=6.5% · Rolling: median CAGR · Fund column is sticky
     </div>`;
 }
 
@@ -5533,12 +5835,11 @@ async function renderHomeScreen() {
 
   el.innerHTML = `
     <div style="
-      min-height: calc(100vh - 120px);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 40px 20px;
+      padding: 80px 20px 40px;
     ">
       <!-- Logo + tagline -->
       <div style="text-align:center;margin-bottom:36px;">
@@ -5666,10 +5967,8 @@ async function renderHomeScreen() {
 
 
 
-// Call renderHomeScreen when watchlist is ready
-setTimeout(() => {
-  if (document.getElementById('homeScreen')) renderHomeScreen();
-}, 1000);
+// Render home screen immediately on script load
+renderHomeScreen();
 
 // ─── EXPORT FUNCTIONS ────────────────────────────────────────────────────────────────────────────────────
 function tableToData(tableId) {
@@ -5801,24 +6100,24 @@ function showToast(msg, type = '') {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// Set default dates
+// Set default dates — guard against null for removed elements
 const today = new Date();
 const oneYearAgo = new Date(today); oneYearAgo.setFullYear(today.getFullYear() - 1);
 const todayStr = today.toISOString().split('T')[0];
 const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0];
-document.getElementById('sipStart').value = oneYearAgoStr;
-document.getElementById('sipEnd').value = todayStr;
-document.getElementById('ptpFrom').value = oneYearAgoStr;
-document.getElementById('ptpTo').value = todayStr;
-// Note: fundPtpFrom/fundPtpTo are set dynamically when fund page renders
-document.getElementById('lumpsipStart').value = oneYearAgoStr;
-document.getElementById('lumpsipEnd').value = todayStr;
-document.getElementById('corrFrom').value = oneYearAgoStr;
-document.getElementById('corrTo').value = todayStr;
-document.getElementById('stepupStart').value = oneYearAgoStr;
-document.getElementById('stepupEnd').value = todayStr;
-document.getElementById('chartFrom').value = oneYearAgoStr;
-document.getElementById('chartTo').value = todayStr;
+function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+setVal('sipStart', oneYearAgoStr);
+setVal('sipEnd', todayStr);
+setVal('ptpFrom', oneYearAgoStr);
+setVal('ptpTo', todayStr);
+setVal('lumpsipStart', oneYearAgoStr);
+setVal('lumpsipEnd', todayStr);
+setVal('corrFrom', oneYearAgoStr);
+setVal('corrTo', todayStr);
+setVal('stepupStart', oneYearAgoStr);
+setVal('stepupEnd', todayStr);
+setVal('chartFrom', oneYearAgoStr);
+setVal('chartTo', todayStr);
 </script>
 </body>
 </html>
