@@ -1024,12 +1024,14 @@
             <div style="position:relative;">
               <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input id="sipBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
+                
+              <input id="sipBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
                   style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--mono);"/>
                 <button onclick="window._clearBench('sip')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;" title="Clear">✕</button>
               </div>
               <div id="sipBenchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
               <div id="sipBenchSelected" style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:4px;"></div>
+            <div id="sipBenchPills" style="margin-top:8px;"></div>
             </div>
           </div>
           <div class="input-group">
@@ -1067,12 +1069,14 @@
             <div style="position:relative;">
               <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input id="ptpBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
+                
+              <input id="ptpBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
                   style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--mono);"/>
                 <button onclick="window._clearBench('ptp')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;" title="Clear">✕</button>
               </div>
               <div id="ptpBenchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
               <div id="ptpBenchSelected" style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:4px;"></div>
+            <div id="ptpBenchPills" style="margin-top:8px;"></div>
             </div>
           </div>
           <div class="input-group">
@@ -1123,7 +1127,8 @@
             <div style="position:relative;">
               <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input id="rollingBenchInput" type="text" placeholder="Search benchmark fund…" autocomplete="off"
+                
+              <input id="rollingBenchInput" type="text" placeholder="Search benchmark fund…" autocomplete="off"
                   style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--mono);"
                 />
                 <button onclick="clearRollingBench()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;" title="Clear">✕</button>
@@ -1135,6 +1140,7 @@
                 max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);
               "></div>
               <div id="rollingBenchSelected" style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:4px;"></div>
+            <div id="rollingBenchPills" style="margin-top:8px;"></div>
             </div>
           </div>
           <div class="input-group">
@@ -1243,12 +1249,14 @@
             <div style="position:relative;">
               <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input id="chartBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
+                
+              <input id="chartBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
                   style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--mono);"/>
                 <button onclick="window._clearBench('chart')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;" title="Clear">✕</button>
               </div>
               <div id="chartBenchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
               <div id="chartBenchSelected" style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:4px;"></div>
+            <div id="chartBenchPills" style="margin-top:8px;"></div>
             </div>
           </div>
           <div class="input-group">
@@ -1374,12 +1382,14 @@
             <div style="position:relative;">
               <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input id="lumpsipBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
+                
+              <input id="lumpsipBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
                   style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--mono);"/>
                 <button onclick="window._clearBench('lumpsip')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;">✕</button>
               </div>
               <div id="lumpsipBenchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
               <div id="lumpsipBenchSelected" style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:4px;"></div>
+            <div id="lumpsipBenchPills" style="margin-top:8px;"></div>
             </div>
           </div>
           <div class="input-group">
@@ -1515,12 +1525,14 @@
             <div style="position:relative;">
               <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input id="scoreBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
+                
+              <input id="scoreBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
                   style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--mono);"/>
                 <button onclick="window._clearBench('score')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;" title="Clear">✕</button>
               </div>
               <div id="scoreBenchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
               <div id="scoreBenchSelected" style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:4px;"></div>
+            <div id="scoreBenchPills" style="margin-top:8px;"></div>
             </div>
           </div>
         </div>
@@ -1562,12 +1574,14 @@
             <div style="position:relative;">
               <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input id="heatmapBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
+                
+              <input id="heatmapBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
                   style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--mono);"/>
                 <button onclick="window._clearBench('heatmap')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;" title="Clear">✕</button>
               </div>
               <div id="heatmapBenchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
               <div id="heatmapBenchSelected" style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:4px;"></div>
+            <div id="heatmapBenchPills" style="margin-top:8px;"></div>
             </div>
           </div>
           <div class="input-group">
@@ -1762,10 +1776,9 @@ function renderFundPage(data) {
   const navArr = navs.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) })).filter(n => !isNaN(n.nav)).reverse(); // oldest first
 
   const ptpReturns = calcPTPReturns(navArr);
-  // Reset SIP benchmark state for new fund
-  _fundSIPBenchCode = '';
-  _fundSIPBenchName = '';
-  _fundSIPBenchXIRRs = {};
+  // Reset bench states for new fund
+  _fundSIPBenchCode = ''; _fundSIPBenchName = ''; _fundSIPBenchXIRRs = {};
+  _fundRollBenchCode = ''; _fundRollBenchName = ''; _fundRollBenchData = {};
 
   const sipData = calcSIPYearly(navArr);
   const rollingData = calcRolling(navArr);
@@ -1868,8 +1881,9 @@ window.switchMetricTab = function(tab) {
     const el = document.getElementById(`metricContent-${t}`);
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
-  if (tab === 'chart') { renderNavChart('all'); }
-  if (tab === 'sip')   { setTimeout(initFundSIPBenchSearch, 50); }
+  if (tab === 'chart')   { renderNavChart('all'); }
+  if (tab === 'sip')     { setTimeout(initFundSIPBenchSearch, 50); }
+  if (tab === 'rolling') { setTimeout(initFundRollBenchSearch, 50); }
 }
 
 // ─── POINT TO POINT RETURNS ──────────────────────────────
@@ -2006,32 +2020,116 @@ window.calcCustomPTP = function() {
     </div>`;
 }
 
+// ─── FUND PAGE ROLLING BENCHMARK ─────────────────────────
+let _fundRollBenchCode = '';
+let _fundRollBenchName = '';
+let _fundRollBenchData = {}; // { 1: {median,min,max,posPct}, 3: {...}, ... }
+
+window._selectFundRollBench = async function(code, name) {
+  _fundRollBenchCode = code;
+  _fundRollBenchName = name;
+  const sel = document.getElementById('fundRollBenchSelected');
+  if (sel) sel.textContent = '⟳ loading…';
+  try {
+    const bData = await getNav(code);
+    const bNav = bData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
+    _fundRollBenchData = {};
+    [1,3,5,7,10].forEach(y => {
+      const r = calcRollingWindow(bNav, y);
+      if (r.median !== null) _fundRollBenchData[y] = r;
+    });
+    if (sel) sel.textContent = '✓ ' + code;
+    // Re-render rolling section
+    const rollEl = document.getElementById('metricContent-rolling');
+    if (rollEl && selectedFund) {
+      const navData = navCache[selectedFund.schemeCode];
+      if (navData) {
+        const navArr2 = navData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
+        rollEl.innerHTML = renderRollingSection(calcRolling(navArr2));
+        initFundRollBenchSearch();
+        const inp2 = document.getElementById('fundRollBenchInput');
+        if (inp2) inp2.value = _fundRollBenchName;
+        const sel2 = document.getElementById('fundRollBenchSelected');
+        if (sel2) sel2.textContent = '✓ ' + _fundRollBenchCode;
+      }
+    }
+  } catch(e) { if (sel) sel.textContent = '✗ error'; }
+};
+
+window._clearFundRollBench = function() {
+  _fundRollBenchCode = ''; _fundRollBenchName = ''; _fundRollBenchData = {};
+  const inp = document.getElementById('fundRollBenchInput');
+  const sel = document.getElementById('fundRollBenchSelected');
+  if (inp) inp.value = '';
+  if (sel) sel.textContent = '';
+  const rollEl = document.getElementById('metricContent-rolling');
+  if (rollEl && selectedFund) {
+    const navData = navCache[selectedFund.schemeCode];
+    if (navData) {
+      const navArr2 = navData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
+      rollEl.innerHTML = renderRollingSection(calcRolling(navArr2));
+      initFundRollBenchSearch();
+    }
+  }
+};
+
+window._selectFundRollBenchPill = async function(idx) {
+  const pill = SHARED_BENCH_PILLS[idx];
+  SHARED_BENCH_PILLS.forEach((_,i) => {
+    const el = document.getElementById(`frpill-${i}`);
+    if (!el) return;
+    el.dataset.active = i===idx ? '1' : '';
+    el.style.borderColor = i===idx ? 'var(--accent)' : 'var(--border2)';
+    el.style.color       = i===idx ? 'var(--accent)' : 'var(--text3)';
+    el.style.background  = i===idx ? 'rgba(232,170,46,0.08)' : 'transparent';
+  });
+  await window._selectFundRollBench(pill.code, pill.label);
+};
+
+function initFundRollBenchSearch() {
+  const inp = document.getElementById('fundRollBenchInput');
+  const res = document.getElementById('fundRollBenchResults');
+  if (!inp || !res) return;
+  let t;
+  inp.addEventListener('blur', () => setTimeout(() => { res.style.display='none'; }, 200));
+  inp.addEventListener('input', e => {
+    clearTimeout(t);
+    const q = e.target.value.trim();
+    if (q.length < 2) { res.style.display='none'; return; }
+    t = setTimeout(async () => {
+      const results = await searchFunds(q);
+      if (!results.length) { res.style.display='none'; return; }
+      res.innerHTML = results.slice(0,7).map(f => `
+        <div onclick="window._selectFundRollBench('${f.schemeCode}','${f.schemeName.replace(/'/g,"\\'")}')"
+          style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:11px;font-family:var(--mono);color:var(--text);transition:background 0.1s;"
+          onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
+          <div>${f.schemeName.substring(0,55)}</div>
+          <div style="font-size:9px;color:var(--text3);margin-top:1px;">${f.schemeCode}</div>
+        </div>`).join('');
+      res.style.display = 'block';
+    }, 280);
+  });
+}
+
 // ─── FUND PAGE SIP BENCHMARK ─────────────────────────────
 let _fundSIPBenchCode = '';
 let _fundSIPBenchName = '';
 let _fundSIPBenchXIRRs = {}; // { '1Y': 12.3, '3Y': 14.2, ... }
 
 window._selectBenchPill = async function(idx) {
-  const PILLS = [
-    { label:'Nifty 50',        code:'120716' },
-    { label:'Nifty 500',       code:'147625' },
-    { label:'Nifty Next 50',   code:'143341' },
-    { label:'Midcap 150',      code:'147622' },
-    { label:'Smallcap 250',    code:'148519' },
-    { label:'LargeMidcap 250', code:'149339' },
-  ];
-  const pill = PILLS[idx];
-
+  const pill = SHARED_BENCH_PILLS[idx];
   // Highlight active pill
-  document.querySelectorAll('[id^="benchPill"]').forEach((el,i) => {
-    el.style.borderColor = i === idx ? 'var(--accent)' : 'var(--border2)';
-    el.style.color       = i === idx ? 'var(--accent)' : 'var(--text3)';
-    el.style.background  = i === idx ? 'rgba(232,170,46,0.08)' : 'transparent';
+  SHARED_BENCH_PILLS.forEach((_,i) => {
+    const el = document.getElementById(`benchPill${i}`);
+    if (!el) return;
+    const active = i === idx;
+    el.dataset.active = active ? '1' : '';
+    el.style.borderColor = active ? 'var(--accent)' : 'var(--border2)';
+    el.style.color       = active ? 'var(--accent)' : 'var(--text3)';
+    el.style.background  = active ? 'rgba(232,170,46,0.08)' : 'transparent';
   });
-
   const sel = document.getElementById('fundSIPBenchSelected');
   if (sel) sel.textContent = `⟳ loading ${pill.label}…`;
-
   await window._selectFundSIPBench(pill.code, pill.label);
 };
 
@@ -2231,26 +2329,16 @@ function renderSIPSection(sipData) {
       ` : ''}
     </div>`;
 
-  // Benchmark search bar + quick-select pills
-  const BENCH_PILLS = [
-    { label: 'Nifty 50',            q: 'UTI Nifty 50 Index Fund Direct Growth',              match: n => n.includes('UTI') && n.includes('Nifty 50') && n.includes('Direct') && n.includes('Growth') && !n.includes('Next') },
-    { label: 'Nifty 500',           q: 'Motilal Oswal Nifty 500 Index Fund Direct Growth',   match: n => n.includes('Motilal') && n.includes('Nifty 500') && n.includes('Direct') && !n.includes('Multicap') && !n.includes('Momentum') },
-    { label: 'Nifty Next 50',       q: 'UTI Nifty Next 50 Index Fund Direct Growth',         match: n => n.includes('UTI') && n.includes('Next 50') && n.includes('Direct') },
-    { label: 'Midcap 150',          q: 'Motilal Oswal Nifty Midcap 150 Index Fund Direct',   match: n => n.includes('Motilal') && n.includes('Midcap 150') && n.includes('Direct') },
-    { label: 'Smallcap 250',        q: 'Nippon India Nifty Smallcap 250 Index Fund Direct',  match: n => n.includes('Nippon') && n.includes('Smallcap 250') && n.includes('Direct') },
-    { label: 'LargeMidcap 250',     q: 'Edelweiss Nifty LargeMidcap 250 Index Fund Direct',  match: n => n.includes('Edelweiss') && n.includes('LargeMidcap') && n.includes('Direct') },
-  ];
-
   const pillsHTML = `
     <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;align-self:center;white-space:nowrap;">QUICK SELECT:</span>
-      ${BENCH_PILLS.map((p,i) => `
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;align-self:center;white-space:nowrap;">QUICK:</span>
+      ${SHARED_BENCH_PILLS.map((p,i) => `
         <button onclick="window._selectBenchPill(${i})"
           id="benchPill${i}"
-          style="padding:3px 10px;border-radius:20px;font-family:var(--mono);font-size:10px;cursor:pointer;
+          style="padding:2px 9px;border-radius:20px;font-family:var(--mono);font-size:10px;cursor:pointer;
                  border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;"
           onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
-          onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text3)'">
+          onmouseout="if(!this.dataset.active){this.style.borderColor='var(--border2)';this.style.color='var(--text3)'}">
           ${p.label}
         </button>`).join('')}
     </div>`;
@@ -2360,19 +2448,25 @@ function closestNavFast(navArr, targetMs, maxGapDays) {
 
 function renderRollingSection(rolling) {
   if (!rolling.length) return '<div class="loading-wrap"><span>Insufficient data for rolling returns</span></div>';
+
   const cards = rolling.map(r => {
     const medCol = r.median > 15 ? 'var(--positive)' : r.median > 8 ? 'var(--accent)' : r.median > 0 ? 'var(--saffron)' : 'var(--negative)';
     const minCol = r.min >= 0 ? 'var(--positive)' : 'var(--negative)';
     const maxCol = r.max >= 0 ? 'var(--positive)' : 'var(--negative)';
     const barW   = Math.min(r.posPct, 100);
     const barCol = r.posPct >= 75 ? 'var(--positive)' : r.posPct >= 50 ? 'var(--accent)' : 'var(--negative)';
+
+    const bench = _fundRollBenchData[r.years];
+    const alpha = bench ? r.median - bench.median : null;
+    const alphaCol = alpha === null ? '' : alpha > 0 ? 'var(--positive)' : 'var(--negative)';
+
     return `
       <div class="rolling-card" style="position:relative;overflow:hidden;">
         <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${medCol};opacity:0.6;"></div>
         <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;">
-          ${r.years}Y Rolling <span style="color:var(--text3);opacity:0.6;">· ${r.count} periods</span>
+          ${r.years}Y Rolling <span style="opacity:0.5;">· ${r.count} periods</span>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
           <div>
             <div style="font-size:8px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Median</div>
             <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:${medCol};line-height:1;">${r.median.toFixed(1)}%</div>
@@ -2386,19 +2480,59 @@ function renderRollingSection(rolling) {
             <div style="font-size:14px;font-weight:600;font-family:var(--mono);color:${maxCol};line-height:1;">${r.max.toFixed(1)}%</div>
           </div>
         </div>
+        ${bench ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px solid var(--border);">
+          <div>
+            <div style="font-size:8px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;margin-bottom:3px;">Bench Median</div>
+            <div style="font-size:13px;font-family:var(--mono);color:var(--text2);">${bench.median.toFixed(1)}%</div>
+          </div>
+          <div>
+            <div style="font-size:8px;font-family:var(--mono);color:var(--accent);text-transform:uppercase;margin-bottom:3px;">Alpha</div>
+            <div style="font-size:14px;font-weight:700;font-family:var(--mono);color:${alphaCol};">${alpha>0?'+':''}${alpha.toFixed(1)}%</div>
+          </div>
+        </div>` : ''}
         <div style="height:3px;background:var(--surface3);border-radius:2px;overflow:hidden;margin-bottom:7px;">
-          <div style="width:${barW}%;height:100%;background:${barCol};border-radius:2px;transition:width 0.5s;"></div>
+          <div style="width:${barW}%;height:100%;background:${barCol};border-radius:2px;"></div>
         </div>
         <div style="font-size:9.5px;font-family:var(--mono);color:var(--text3);">
           Positive: <span style="color:${barCol};font-weight:600;">${r.posPct.toFixed(1)}%</span>
-          <span style="margin-left:8px;opacity:0.5;">of periods</span>
         </div>
       </div>`;
   }).join('');
 
+  // Benchmark search bar for rolling
+  const rollBenchBar = `
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
+        <span style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;white-space:nowrap;">QUICK:</span>
+        ${SHARED_BENCH_PILLS.map((p,i) => `
+          <button onclick="window._selectFundRollBenchPill(${i})" id="frpill-${i}"
+            style="padding:2px 9px;border-radius:20px;font-family:var(--mono);font-size:10px;cursor:pointer;
+                   border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;"
+            onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+            onmouseout="if(!this.dataset.active){this.style.borderColor='var(--border2)';this.style.color='var(--text3)'}">
+            ${p.label}
+          </button>`).join('')}
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;white-space:nowrap;">OR SEARCH:</div>
+        <div style="position:relative;flex:1;min-width:200px;max-width:340px;">
+          <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:7px 11px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="fundRollBenchInput" type="text" placeholder="Any fund as benchmark…" autocomplete="off"
+              style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:11px;font-family:var(--mono);" />
+            <button onclick="window._clearFundRollBench()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;">✕</button>
+          </div>
+          <div id="fundRollBenchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
+          <div id="fundRollBenchSelected" style="font-size:9.5px;color:var(--accent);font-family:var(--mono);margin-top:3px;">${_fundRollBenchCode ? '✓ '+_fundRollBenchCode+' · '+_fundRollBenchName.substring(0,35) : ''}</div>
+        </div>
+      </div>
+    </div>`;
+
   return `
     <div style="margin-bottom:8px;">
       <div class="section-title">Rolling Returns · Daily CAGR</div>
+      ${rollBenchBar}
       <div class="rolling-grid">${cards}</div>
     </div>`;
 }
@@ -2835,10 +2969,14 @@ async function loadCompareWatchlist() {
   }).join('');
 
   document.getElementById('compareTable').innerHTML = `
-    <div class="export-bar">
-      <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
-      <button class="btn-export btn-export-csv"  onclick="exportTableCSV('${wlTid}','Watchlist_Compare')">⬇ CSV</button>
-      <button class="btn-export btn-export-xlsx" onclick="exportTableXLSX('${wlTid}','Watchlist_Compare')">⬇ Excel</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;">
+        ${funds.length} FUNDS · TRAILING RETURNS · CAGR ≥1Y / ABS <1Y
+      </div>
+      <div class="export-bar" style="margin:0;">
+        <button class="btn-export csv" onclick="exportTableCSV('${wlTid}','Watchlist_Compare')">⬇ CSV</button>
+        <button class="btn-export xl"  onclick="exportTableXLSX('${wlTid}','Watchlist_Compare')">⬇ Excel</button>
+      </div>
     </div>
     <div class="compare-table-wrap">
       <table class="compare-table" id="${wlTid}">
@@ -3235,6 +3373,9 @@ window._selectBench = function(tab, code, name) {
 function initBenchSearch(tab) {
   const inp = document.getElementById(tab + 'BenchInput');
   const res = document.getElementById(tab + 'BenchResults');
+  // Inject pills
+  const pillsEl = document.getElementById(tab + 'BenchPills');
+  if (pillsEl && !pillsEl.innerHTML) pillsEl.innerHTML = benchPillsHTML(tab);
   if (!inp || !res) return;
   let t;
   inp.addEventListener('blur', () => setTimeout(() => { res.style.display = 'none'; }, 200));
@@ -3263,6 +3404,26 @@ setTimeout(() => {
 
 // ─── ROLLING BENCHMARK SEARCH ────────────────────────────
 let _rollingBenchCode = '', _rollingBenchName = '';
+
+window._selectRollingBenchPill = function(idx) {
+  const pill = SHARED_BENCH_PILLS[idx];
+  SHARED_BENCH_PILLS.forEach((_,i) => {
+    const el = document.getElementById(`rbpill-${i}`);
+    if (!el) return;
+    const active = i === idx;
+    el.dataset.active = active ? '1' : '';
+    el.style.borderColor = active ? 'var(--accent)' : 'var(--border2)';
+    el.style.color       = active ? 'var(--accent)' : 'var(--text3)';
+    el.style.background  = active ? 'rgba(232,170,46,0.08)' : 'transparent';
+  });
+  _rollingBenchCode = pill.code;
+  _rollingBenchName = pill.label;
+  const inp = document.getElementById('rollingBenchInput');
+  const sel = document.getElementById('rollingBenchSelected');
+  if (inp) inp.value = pill.label;
+  if (sel) sel.textContent = '✓ ' + pill.code;
+};
+
 window.clearRollingBench = function() {
   _rollingBenchCode = ''; _rollingBenchName = '';
   const inp = document.getElementById('rollingBenchInput');
@@ -3271,6 +3432,17 @@ window.clearRollingBench = function() {
   if (sel) sel.textContent = '';
 };
 setTimeout(() => {
+  // Inject rolling bench pills
+  const pillsEl = document.getElementById('rollingBenchPills');
+  if (pillsEl && !pillsEl.innerHTML) {
+    pillsEl.innerHTML = `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;white-space:nowrap;">QUICK:</span>
+      ${SHARED_BENCH_PILLS.map((p,i) => `<button onclick="window._selectRollingBenchPill(${i})" id="rbpill-${i}"
+        style="padding:2px 9px;border-radius:20px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+        onmouseout="if(!this.dataset.active){this.style.borderColor='var(--border2)';this.style.color='var(--text3)'}">${p.label}</button>`).join('')}
+    </div>`;
+  }
   const inp = document.getElementById('rollingBenchInput');
   const res = document.getElementById('rollingBenchResults');
   const sel = document.getElementById('rollingBenchSelected');
@@ -3304,6 +3476,51 @@ window._selectRollingBench = function(code, name) {
   if (inp) inp.value = name.substring(0,55);
   if (res) res.style.display = 'none';
   if (sel) sel.textContent = '✓ ' + code;
+};
+
+// ─── SHARED BENCHMARK PILLS ──────────────────────────────
+const SHARED_BENCH_PILLS = [
+  { label:'Nifty 50',        code:'120716' },
+  { label:'Nifty 500',       code:'147625' },
+  { label:'Nifty Next 50',   code:'143341' },
+  { label:'Midcap 150',      code:'147622' },
+  { label:'Smallcap 250',    code:'148519' },
+  { label:'LargeMidcap 250', code:'149339' },
+];
+
+function benchPillsHTML(tab) {
+  return `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
+    <span style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;white-space:nowrap;">QUICK:</span>
+    ${SHARED_BENCH_PILLS.map((p,i) => `
+      <button onclick="window._selectSharedBenchPill('${tab}',${i})"
+        id="sbpill-${tab}-${i}"
+        style="padding:2px 9px;border-radius:20px;font-family:var(--mono);font-size:10px;cursor:pointer;
+               border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+        onmouseout="if(!this.dataset.active){this.style.borderColor='var(--border2)';this.style.color='var(--text3)'}">
+        ${p.label}
+      </button>`).join('')}
+  </div>`;
+}
+
+window._selectSharedBenchPill = function(tab, idx) {
+  const pill = SHARED_BENCH_PILLS[idx];
+  // Highlight pill
+  SHARED_BENCH_PILLS.forEach((_,i) => {
+    const el = document.getElementById(`sbpill-${tab}-${i}`);
+    if (!el) return;
+    const active = i === idx;
+    el.dataset.active = active ? '1' : '';
+    el.style.borderColor = active ? 'var(--accent)' : 'var(--border2)';
+    el.style.color       = active ? 'var(--accent)' : 'var(--text3)';
+    el.style.background  = active ? 'rgba(232,170,46,0.08)' : 'transparent';
+  });
+  // Set via shared _benchState
+  _benchState[tab] = { code: pill.code, name: pill.label };
+  const inp = document.getElementById(tab + 'BenchInput');
+  const sel = document.getElementById(tab + 'BenchSelected');
+  if (inp) inp.value = pill.label;
+  if (sel) sel.textContent = '✓ ' + pill.code;
 };
 
 // ─── ROLLING TYPE TOGGLE ─────────────────────────────────
@@ -5682,25 +5899,35 @@ window.buildCatHeatmap = async function() {
   </tr>`).join('');
 
   resultEl.innerHTML = `
-    <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;">
-      <span>${fundRows.length} funds · Regular Growth</span>
-      <span style="color:var(--accent2);">■ &gt;5% great</span>
-      <span style="color:rgba(0,255,157,0.6);">■ 3-5% good</span>
-      <span style="color:rgba(0,255,157,0.35);">■ 1-3% ok</span>
-      <span style="color:rgba(239,71,111,0.6);">■ negative</span>
-    </div>
-    <div class="export-bar">
-      <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
-      <button class="btn-export btn-export-csv"  onclick="exportTableCSV('heatmapTable','Category_Heatmap')">⬇ CSV</button>
-      <button class="btn-export btn-export-xlsx" onclick="exportTableXLSX('heatmapTable','Category_Heatmap')">⬇ Excel</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;">${fundRows.length} FUNDS · REGULAR GROWTH · MONTHLY RETURNS</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <span style="font-size:9px;font-family:var(--mono);color:var(--text3);">Scale:</span>
+          ${[['≥5%','rgba(45,212,160,0.85)','#0a1a14'],['3-5%','rgba(45,212,160,0.55)','var(--text)'],['1-3%','rgba(45,212,160,0.25)','var(--text)'],['0-1%','rgba(45,212,160,0.1)','var(--text3)'],['neg','rgba(240,92,120,0.6)','var(--text)']].map(([l,bg,tc])=>`
+          <div style="display:flex;align-items:center;gap:3px;">
+            <div style="width:18px;height:10px;border-radius:2px;background:${bg};"></div>
+            <span style="font-size:9px;font-family:var(--mono);color:var(--text3);">${l}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="export-bar" style="margin:0;">
+        <button class="btn-export csv" onclick="exportTableCSV('heatmapTable','Category_Heatmap')">⬇ CSV</button>
+        <button class="btn-export xl"  onclick="exportTableXLSX('heatmapTable','Category_Heatmap')">⬇ Excel</button>
+      </div>
     </div>
     <div class="compare-table-wrap" style="overflow-x:auto;">
-      <table class="compare-table" style="min-width:${200+months.length*60}px;border-collapse:collapse;" id="heatmapTable">
-        <thead><tr><th style="text-align:left;min-width:200px;">Fund</th>${headerCols}</tr></thead>
+      <table class="compare-table" style="min-width:${200+months.length*58}px;border-collapse:collapse;" id="heatmapTable">
+        <thead><tr>
+          <th style="text-align:left;min-width:200px;position:sticky;left:0;background:var(--surface2);z-index:2;">Fund</th>
+          ${headerCols}
+        </tr></thead>
         <tbody>${catAvgRow}${benchRow}${fundRowsHTML}</tbody>
       </table>
     </div>
-    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:8px;">* Regular Growth funds only / Monthly returns = first to last available NAV within month / Category Avg = equal-weight average of all loaded funds</div>`;
+    <div style="font-size:9.5px;color:var(--text3);font-family:var(--mono);margin-top:8px;">
+      * Monthly returns · Category Avg = simple mean of all active funds · Sorted by latest month return
+    </div>`;
 }
 
 // ─── MOBILE UI ───────────────────────────────────────────
