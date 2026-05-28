@@ -393,11 +393,15 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 3px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .metrics-tabs::-webkit-scrollbar { display: none; }
 
   .metric-tab {
-    flex: 1;
-    padding: 7px;
+    flex: 0 0 auto;
+    padding: 7px 12px;
     text-align: center;
     border-radius: var(--radius-sm);
     font-size: 10.5px;
@@ -406,6 +410,7 @@
     color: var(--text3);
     transition: all 0.15s;
     letter-spacing: 0.3px;
+    white-space: nowrap;
   }
   .metric-tab:hover { color: var(--text2); }
   .metric-tab.active { background: var(--surface3); color: var(--accent); }
@@ -963,7 +968,13 @@
       <span class="bnav-icon">🔍</span>Category
     </button>
     <button class="bottom-nav-item" id="bnav-more" onclick="toggleDrawer()">
-      <span class="bnav-icon">☰</span>More
+      <span class="bnav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </span>More
     </button>
   </div>
 </div>
@@ -1018,25 +1029,39 @@
     <div class="page" id="page-sipcalc">
       <div class="section-title">SIP Returns Calculator</div>
       <div class="ptp-card">
-        <div class="input-row" style="align-items:flex-end; margin-bottom:20px; flex-wrap:wrap;">
-          <div class="input-group" style="min-width:240px;">
-            <label class="input-label">Benchmark (shared)</label>
-            <div style="position:relative;">
-              <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                
+
+        <!-- Row 1: Benchmark -->
+        <div style="margin-bottom:14px;">
+          <label class="input-label">Benchmark (shared)</label>
+          <div style="position:relative;max-width:480px;margin-top:5px;">
+            <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input id="sipBenchInput" type="text" placeholder="Search benchmark…" autocomplete="off"
-                  style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--mono);"/>
-                <button onclick="window._clearBench('sip')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;" title="Clear">✕</button>
-              </div>
-              <div id="sipBenchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
-              <div id="sipBenchSelected" style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:4px;"></div>
-            <div id="sipBenchPills" style="margin-top:8px;"></div>
+                style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--mono);"/>
+              <button onclick="window._clearBench('sip')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;">✕</button>
             </div>
+            <div id="sipBenchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
+            <div id="sipBenchSelected" style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:4px;"></div>
+            <div id="sipBenchPills" style="margin-top:8px;"></div>
+          </div>
+        </div>
+
+        <!-- Row 2: All inputs in one row -->
+        <div class="input-row" style="align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <div class="input-group">
+            <label class="input-label">SIP Amount (₹)</label>
+            <input class="input-field" type="number" id="sipAmount" value="10000" style="width:120px;">
           </div>
           <div class="input-group">
-            <label class="input-label">Monthly SIP (₹)</label>
-            <input class="input-field" type="number" id="sipAmount" value="10000" style="width:130px;">
+            <label class="input-label">Frequency</label>
+            <select class="input-field" id="sipFrequency" style="width:140px;">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="fortnightly">Fortnightly</option>
+              <option value="monthly" selected>Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="halfyearly">Half-Yearly</option>
+            </select>
           </div>
           <div class="input-group">
             <label class="input-label">Start Date</label>
@@ -1047,13 +1072,14 @@
             <input class="input-field" type="date" id="sipEnd" style="width:150px;">
           </div>
         </div>
-        <div style="margin-bottom:12px; font-size:10px; font-family:var(--mono); color:var(--text3); letter-spacing:1.5px; text-transform:uppercase;">Funds to Compare</div>
+
+        <div style="margin-bottom:12px;font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;">Funds to Compare</div>
         <div id="sipFundSlots"></div>
-        <div style="display:flex; gap:10px; align-items:center; margin-top:16px; flex-wrap:wrap;">
+        <div style="display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;">
           <button class="btn btn-secondary" onclick="addSlot('sip')" id="sipAddBtn">+ Add Fund</button>
           <button class="btn btn-primary" onclick="calcSIP()">Calculate All</button>
           <button class="btn btn-secondary" onclick="clearSlots('sip')" style="color:var(--danger);border-color:var(--danger);">Clear All</button>
-          <span id="sipSlotCount" style="font-size:11px; font-family:var(--mono); color:var(--text3);"></span>
+          <span id="sipSlotCount" style="font-size:11px;font-family:var(--mono);color:var(--text3);"></span>
         </div>
         <div id="sipCalcResult" style="margin-top:24px;"></div>
       </div>
@@ -2239,16 +2265,34 @@ function calcSIPYearly(navArr) {
   return results;
 }
 
-function buildSIPCashflows(navArr, startDate, endDate, monthlyAmt) {
+function buildSIPCashflows(navArr, startDate, endDate, amt, frequency = 'monthly') {
   const cashflows = [];
   let d = new Date(startDate);
-  d.setDate(1);
+
+  // Normalise start to 1st of month for monthly/quarterly/halfyearly
+  if (['monthly','quarterly','halfyearly'].includes(frequency)) d.setDate(1);
+
+  const advance = (date) => {
+    const n = new Date(date);
+    switch(frequency) {
+      case 'daily':       n.setDate(n.getDate() + 1);    break;
+      case 'weekly':      n.setDate(n.getDate() + 7);    break;
+      case 'fortnightly': n.setDate(n.getDate() + 14);   break;
+      case 'monthly':     n.setMonth(n.getMonth() + 1);  break;
+      case 'quarterly':   n.setMonth(n.getMonth() + 3);  break;
+      case 'halfyearly':  n.setMonth(n.getMonth() + 6);  break;
+    }
+    return n;
+  };
+
   while (d <= endDate) {
     const nav = closestNav(navArr, new Date(d));
-    if (nav) cashflows.push({ date: new Date(d), amount: -monthlyAmt, nav: nav.nav });
-    d.setMonth(d.getMonth() + 1);
+    if (nav) cashflows.push({ date: new Date(d), amount: -amt, nav: nav.nav });
+    d = advance(d);
   }
-  // Add redemption at end
+
+  if (!cashflows.length) return cashflows;
+  // Redemption at end
   const totalUnits = cashflows.reduce((s, c) => s + Math.abs(c.amount) / c.nav, 0);
   const lastNav = navArr[navArr.length - 1];
   cashflows.push({ date: lastNav.date, amount: totalUnits * lastNav.nav });
@@ -2268,6 +2312,11 @@ function renderSIPSection(sipData) {
     return (v/1000).toFixed(1) + 'K';
   };
 
+  const isMobile = window.innerWidth < 600;
+  const gridCols = isMobile
+    ? '40px 70px 80px 80px 55px' + (hasBench ? ' 60px 65px' : '')
+    : '52px 1fr 80px 90px 90px 72px' + (hasBench ? ' 72px 80px' : '');
+
   const rows = sipData.map((s, i) => {
     const worth   = s.invested * Math.pow(1 + (s.xirr||0)/100, s.years);
     const multip  = worth / s.invested;
@@ -2283,20 +2332,18 @@ function renderSIPSection(sipData) {
     return `
     <div style="
       display:grid;
-      grid-template-columns: 52px 1fr 80px 90px 90px 72px ${hasBench ? '72px 80px' : ''};
+      grid-template-columns: ${gridCols};
       align-items:center;
-      padding: 11px 18px;
+      padding: 11px 14px;
       border-bottom: 1px solid var(--border);
       transition: background 0.12s;
     " onmouseover="this.style.background='rgba(255,255,255,0.025)'" onmouseout="this.style.background='transparent'">
       <div style="font-family:var(--mono);font-size:11px;color:var(--text3);">${s.years}Y</div>
-      <div style="padding-right:16px;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="flex:1;height:3px;background:var(--surface3);border-radius:2px;overflow:hidden;">
-            <div style="width:${barW}%;height:100%;background:${xirrCol};border-radius:2px;"></div>
-          </div>
+      ${!isMobile ? `<div style="padding-right:16px;">
+        <div style="height:3px;background:var(--surface3);border-radius:2px;overflow:hidden;">
+          <div style="width:${barW}%;height:100%;background:${xirrCol};border-radius:2px;"></div>
         </div>
-      </div>
+      </div>` : ''}
       <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${xirrCol};text-align:right;">${xirr.toFixed(2)}%</div>
       <div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:right;">₹${fmtAmt(s.invested)}</div>
       <div style="font-family:var(--mono);font-size:12px;color:var(--text);text-align:right;font-weight:600;">₹${fmtAmt(worth)}</div>
@@ -2311,20 +2358,20 @@ function renderSIPSection(sipData) {
   const header = `
     <div style="
       display:grid;
-      grid-template-columns: 52px 1fr 80px 90px 90px 72px ${hasBench ? '72px 80px' : ''};
-      padding: 9px 18px;
+      grid-template-columns: ${gridCols};
+      padding: 9px 14px;
       background: var(--surface2);
       border-bottom: 1px solid var(--border);
       border-radius: var(--radius) var(--radius) 0 0;
     ">
       <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;">Period</div>
-      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;">XIRR Trend</div>
+      ${!isMobile ? `<div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;">Trend</div>` : ''}
       <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">XIRR</div>
       <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Invested</div>
       <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Est. Value</div>
-      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Multiple</div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Mult.</div>
       ${hasBench ? `
-      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Bench XIRR</div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Bench</div>
       <div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;text-align:right;">Alpha</div>
       ` : ''}
     </div>`;
@@ -2373,8 +2420,10 @@ function renderSIPSection(sipData) {
         </div>
       </div>
       ${benchBar}
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
         ${header}${rows}
+      </div>
       </div>
       <div style="font-size:9.5px;color:var(--text3);font-family:var(--mono);margin-top:8px;padding:0 2px;">
         * XIRR via Newton-Raphson · Multiple = Est. Value ÷ Invested${hasBench ? ' · Alpha = Fund XIRR − Benchmark XIRR' : ''}
@@ -3210,15 +3259,17 @@ window.sortGenericTable = function(tableId, colIdx) {
 
 // ─── SIP MULTI CALC ──────────────────────────────────────
 window.calcSIP = async function() {
-  const benchCode = _benchState['sip'].code;
-  const amt = parseFloat(document.getElementById('sipAmount').value) || 10000;
-  const startStr = document.getElementById('sipStart').value;
-  const endStr = document.getElementById('sipEnd').value;
+  const benchCode  = _benchState['sip'].code;
+  const amt        = parseFloat(document.getElementById('sipAmount').value) || 10000;
+  const frequency  = document.getElementById('sipFrequency').value || 'monthly';
+  const startStr   = document.getElementById('sipStart').value;
+  const endStr     = document.getElementById('sipEnd').value;
   const validSlots = slotState.sip.slots.filter(s => s.code);
   if (!validSlots.length) { showToast('Add and select at least one fund', 'error'); return; }
   if (!startStr || !endStr) { showToast('Select start and end dates', 'error'); return; }
   const resultEl = document.getElementById('sipCalcResult');
   resultEl.innerHTML = `<div class="loading-wrap"><div class="spinner"></div><span>Calculating ${validSlots.length} fund${validSlots.length>1?'s':''}...</span></div>`;
+  const freqLabels = { daily:'Daily', weekly:'Weekly', fortnightly:'Fortnightly', monthly:'Monthly', quarterly:'Quarterly', halfyearly:'Half-Yearly' };
   try {
     const startD = new Date(startStr), endD = new Date(endStr);
     const bench = await loadBenchmark(benchCode, startD, endD, amt, 'sip');
@@ -3227,7 +3278,7 @@ window.calcSIP = async function() {
       try {
         const fData = await getNav(slot.code);
         const navArr = fData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
-        const cf = buildSIPCashflows(navArr, startD, endD, amt);
+        const cf = buildSIPCashflows(navArr, startD, endD, amt, frequency);
         const xirr = calcXIRR(cf);
         const invested = cf.filter(c=>c.amount<0).length * amt;
         const finalVal = cf[cf.length-1].amount;
@@ -3240,10 +3291,11 @@ window.calcSIP = async function() {
     const okR = results.filter(r=>r.ok);
     const bestXirr = okR.length ? Math.max(...okR.map(r=>r.xirr)) : 0;
     const worstXirr = okR.length ? Math.min(...okR.map(r=>r.xirr)) : 0;
+    const freqLabel = freqLabels[frequency] || frequency;
     const summary = summaryBoxes([
-      {label:'SIP Amount', value:`₹${amt.toLocaleString('en-IN')}/mo`, sub:`${results[0]?.installments||'—'} installments · ${startStr} → ${endStr}`, color:'var(--text)'},
+      {label:'SIP Amount', value:`₹${amt.toLocaleString('en-IN')}`, sub:`${freqLabel} · ${results[0]?.installments||'—'} instalments · ${startStr} → ${endStr}`, color:'var(--text)'},
       ...(bench ? [{label:'Benchmark XIRR', value:`${bench.xirr.toFixed(2)}%`, sub:bench.name.substring(0,38), color:'var(--text2)'}] : []),
-      {label:'Best XIRR 🥇', value:`${bestXirr.toFixed(2)}%`, sub:okR.find(r=>r.xirr===bestXirr)?.name?.substring(0,35)||'', color:'var(--accent2)'},
+      {label:'Best XIRR 🥇', value:`${bestXirr.toFixed(2)}%`, sub:okR.find(r=>r.xirr===bestXirr)?.name?.substring(0,35)||'', color:'var(--positive)'},
       {label:'Worst XIRR', value:`${worstXirr.toFixed(2)}%`, sub:okR.find(r=>r.xirr===worstXirr)?.name?.substring(0,35)||'', color: worstXirr<0?'var(--danger)':'var(--warn)'},
     ]);
     const tableRows = results.map((r,i)=>{
@@ -3256,7 +3308,7 @@ window.calcSIP = async function() {
       return `<tr style="${isBest?'background:rgba(45,212,160,0.04)':isWorst?'background:rgba(240,92,120,0.04)':''}">
         <td style="text-align:left;white-space:normal;max-width:240px;">
           <div style="font-size:12px;color:var(--text);margin-bottom:2px;">${isBest?'🥇 ':isWorst?'🔴 ':''}${r.name.substring(0,52)}${r.name.length>52?'…':''}</div>
-          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:5px;">${r.code} · ${r.installments} instalments</div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:5px;">${r.code} · ${r.installments} instalments · ${freqLabel}</div>
           <div style="height:2px;background:var(--surface3);border-radius:2px;overflow:hidden;max-width:180px;">
             <div style="width:${barW}%;height:100%;background:${xirrCol};border-radius:2px;"></div>
           </div>
@@ -3270,7 +3322,7 @@ window.calcSIP = async function() {
       </tr>`;
     }).join('');
     const cols = [{label:'Fund',left:true,nosort:true},{label:'XIRR'},{label:'Invested'},{label:'Final Value'},{label:'Gain/Loss'},{label:'Abs Return'},...(bench?[{label:'Alpha'}]:[])];
-    resultEl.innerHTML = summary + resultsTable(cols, tableRows, '* Sorted by XIRR desc · SIP on 1st of each month · XIRR via Newton-Raphson');
+    resultEl.innerHTML = summary + resultsTable(cols, tableRows, `* ${freqLabel} SIP · XIRR via Newton-Raphson`);
   } catch(e) { resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:12px;padding:12px;">${e.message}</div>`; }
 }
 
