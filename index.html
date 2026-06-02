@@ -1105,6 +1105,130 @@
         </div>
         <div id="sipCalcResult" style="margin-top:24px;"></div>
       </div>
+
+      <!-- ══ CATEGORY SIP RANKER ══ -->
+      <div style="margin-top:28px;">
+        <div class="section-title" style="margin-bottom:16px;">Category SIP Ranker</div>
+        <div class="ptp-card">
+
+          <!-- Row 1: Category + Plan + Period + Amount -->
+          <div class="input-row" style="align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+            <div class="input-group">
+              <label class="input-label">Category</label>
+              <select class="input-field" id="csr-category" style="width:200px;">
+                <optgroup label="Equity">
+                  <option value="flexi cap">Flexi Cap</option>
+                  <option value="large cap">Large Cap</option>
+                  <option value="mid cap">Mid Cap</option>
+                  <option value="small cap">Small Cap</option>
+                  <option value="multi cap">Multi Cap</option>
+                  <option value="large & mid">Large & Mid Cap</option>
+                  <option value="elss">ELSS</option>
+                  <option value="focused">Focused</option>
+                  <option value="value fund">Value Fund</option>
+                  <option value="contra">Contra</option>
+                  <option value="dividend yield">Dividend Yield</option>
+                  <option value="sectoral">Sectoral / Thematic</option>
+                </optgroup>
+                <optgroup label="Debt">
+                  <option value="liquid">Liquid</option>
+                  <option value="overnight">Overnight</option>
+                  <option value="ultra short">Ultra Short Duration</option>
+                  <option value="low duration">Low Duration</option>
+                  <option value="short duration">Short Duration</option>
+                  <option value="medium duration">Medium Duration</option>
+                  <option value="long duration">Long Duration</option>
+                  <option value="corporate bond">Corporate Bond</option>
+                  <option value="credit risk">Credit Risk</option>
+                  <option value="gilt">Gilt</option>
+                  <option value="dynamic bond">Dynamic Bond</option>
+                  <option value="banking and psu">Banking & PSU</option>
+                </optgroup>
+                <optgroup label="Hybrid">
+                  <option value="aggressive">Aggressive Hybrid</option>
+                  <option value="balanced">Balanced Advantage / BAF</option>
+                  <option value="multi asset">Multi Asset Allocation</option>
+                  <option value="arbitrage">Arbitrage</option>
+                  <option value="equity savings">Equity Savings</option>
+                </optgroup>
+                <optgroup label="Index / ETF">
+                  <option value="nifty 50">Nifty 50 Index</option>
+                  <option value="nifty 500">Nifty 500 Index</option>
+                  <option value="nifty next 50">Nifty Next 50 Index</option>
+                  <option value="midcap 150">Nifty Midcap 150 Index</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Plan Type</label>
+              <select class="input-field" id="csr-plan" style="width:130px;">
+                <option value="direct_growth">Direct Growth</option>
+                <option value="regular_growth">Regular Growth</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Period</label>
+              <select class="input-field" id="csr-period" style="width:110px;">
+                <option value="1">1 Year</option>
+                <option value="2">2 Years</option>
+                <option value="3" selected>3 Years</option>
+                <option value="4">4 Years</option>
+                <option value="5">5 Years</option>
+                <option value="6">6 Years</option>
+                <option value="7">7 Years</option>
+                <option value="8">8 Years</option>
+                <option value="9">9 Years</option>
+                <option value="10">10 Years</option>
+                <option value="11">11 Years</option>
+                <option value="12">12 Years</option>
+                <option value="13">13 Years</option>
+                <option value="14">14 Years</option>
+                <option value="15">15 Years</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="input-label">SIP Amount (₹)</label>
+              <input class="input-field" type="number" id="csr-amount" value="10000" style="width:120px;">
+            </div>
+          </div>
+
+          <!-- Row 1b: Custom date override -->
+          <div class="input-row" style="align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+            <div class="input-group">
+              <label class="input-label">Custom Start Date <span style="color:var(--text3);font-size:9px;">(overrides period)</span></label>
+              <input class="input-field" type="date" id="csr-start" style="width:160px;">
+            </div>
+            <div class="input-group">
+              <label class="input-label">Custom End Date</label>
+              <input class="input-field" type="date" id="csr-end" style="width:160px;">
+            </div>
+            <div class="input-group" style="align-self:flex-end;">
+              <button class="btn btn-secondary" onclick="document.getElementById('csr-start').value='';document.getElementById('csr-end').value='';" style="height:34px;">✕ Clear Dates</button>
+            </div>
+          </div>
+
+          <!-- Row 2: Benchmark -->
+          <div style="margin-bottom:16px;">
+            <label class="input-label">Benchmark for Alpha</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;margin-bottom:8px;">
+              <button id="csrpill-0" onclick="window._csrSelectPill(0)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">Nifty 50</button>
+              <button id="csrpill-1" onclick="window._csrSelectPill(1)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">Nifty 500</button>
+              <button id="csrpill-2" onclick="window._csrSelectPill(2)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">Nifty Next 50</button>
+              <button id="csrpill-3" onclick="window._csrSelectPill(3)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">Midcap 150</button>
+              <button id="csrpill-4" onclick="window._csrSelectPill(4)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">Smallcap 250</button>
+              <button id="csrpill-5" onclick="window._csrSelectPill(5)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">LargeMidcap 250</button>
+            </div>
+            <div style="font-size:10px;font-family:var(--mono);color:var(--accent);min-height:14px;" id="csr-bench-label"></div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="window.runCSR()">▶ Run Ranker</button>
+            <span id="csr-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);"></span>
+          </div>
+
+          <div id="csr-result" style="margin-top:20px;overflow-x:auto;"></div>
+        </div>
+      </div>
     </div>
 
     <!-- PTP CALCULATOR PAGE -->
@@ -1702,17 +1826,68 @@ onSnapshot(wlRef, (snap) => {
 });
 
 // ─── MFAPI ───────────────────────────────────────────────
+// ── Stale fund filter (90-day rule) ──────────────────────
+// Set of schemeCodes whose last NAV is older than 90 days.
+// Built once on first search call, then reused.
+let _staleCodes = null;        // null = not yet loaded, Set once loaded
+let _staleLoadPromise = null;  // deduplication
+
+async function _ensureStaleFilter() {
+  if (_staleCodes !== null) return;           // already loaded
+  if (_staleLoadPromise) return _staleLoadPromise; // already in-flight
+  _staleLoadPromise = (async () => {
+    try {
+      const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      const r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf/latest');
+      const data = await r.json(); // [{schemeCode, schemeName, date, nav}, ...]
+      if (Array.isArray(data)) {
+        _staleCodes = new Set(
+          data
+            .filter(f => {
+              if (!f.date) return true; // no date → treat as stale
+              // date is "DD-MM-YYYY" or "YYYY-MM-DD"
+              const parts = f.date.includes('-') ? f.date.split('-') : [];
+              let d;
+              if (parts.length === 3 && parts[0].length === 4) {
+                d = new Date(f.date); // YYYY-MM-DD
+              } else if (parts.length === 3) {
+                d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); // DD-MM-YYYY
+              } else {
+                return true;
+              }
+              return isNaN(d) || d.getTime() < cutoff;
+            })
+            .map(f => String(f.schemeCode))
+        );
+      } else {
+        _staleCodes = new Set(); // fallback: don't filter anything
+      }
+    } catch(e) {
+      _staleCodes = new Set(); // on failure: don't filter
+    }
+  })();
+  return _staleLoadPromise;
+}
+
+function _filterStale(funds) {
+  if (!_staleCodes || _staleCodes.size === 0) return funds;
+  return funds.filter(f => !_staleCodes.has(String(f.schemeCode)));
+}
+
 async function searchFunds(q) {
+  // Ensure stale filter is ready (non-blocking — fires in background on first call)
+  _ensureStaleFilter();
   // Use search endpoint instead of loading all 17000 funds
   try {
     const r = await fetch(`https://mfapi-proxy.storage4myfile.workers.dev/mf/search?q=${encodeURIComponent(q)}`);
     const data = await r.json();
-    if (Array.isArray(data) && data.length > 0) return data.slice(0, 30);
+    if (Array.isArray(data) && data.length > 0) return _filterStale(data).slice(0, 30);
   } catch(e) {}
   // Fallback: filter from cached list
   if (allFunds.length === 0) return [];
   const ql = q.toLowerCase();
-  return allFunds.filter(f => f.schemeName.toLowerCase().includes(ql)).slice(0, 30);
+  const matched = allFunds.filter(f => f.schemeName.toLowerCase().includes(ql));
+  return _filterStale(matched).slice(0, 30);
 }
 
 async function getNav(schemeCode) {
@@ -1901,6 +2076,20 @@ function renderFundPage(data) {
       <div style="text-align:right;min-width:120px;">
         <div class="nav-pill">Points: <strong>${navArr.length}</strong></div>
         ${meta.scheme_isin_div_reinvest ? `<div class="nav-pill" style="margin-top:4px;">ISIN(D): <strong style="font-size:10px;">${meta.scheme_isin_div_reinvest}</strong></div>` : ''}
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+          <button onclick="window.generateRiskReport('print')"
+            style="padding:5px 12px;background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:var(--mono);font-size:10px;border-radius:var(--radius-sm);cursor:pointer;transition:all 0.15s;"
+            onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+            onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">
+            🖨 Print Report
+          </button>
+          <button onclick="window.generateRiskReport('download')"
+            style="padding:5px 12px;background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:var(--mono);font-size:10px;border-radius:var(--radius-sm);cursor:pointer;transition:all 0.15s;"
+            onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+            onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">
+            ⬇ Download PDF
+          </button>
+        </div>
       </div>
     </div>
 
@@ -2345,46 +2534,47 @@ function renderSIPSection(sipData) {
     const alpha = bXIRR !== null ? xirr - bXIRR : null;
     const alphaCol = alpha === null ? 'var(--text3)' : alpha > 0 ? 'var(--positive)' : 'var(--negative)';
 
+    const gain = worth - s.invested;
+    const gainPct = s.invested > 0 ? (gain / s.invested) * 100 : 0;
+    const gainCol = gain >= 0 ? 'var(--positive)' : 'var(--negative)';
+    const gridCols = hasBench
+      ? '36px 72px 86px 90px 86px 52px 62px 64px'
+      : '36px 72px 86px 90px 86px 52px';
     return `
-    <div style="
-      display:flex;align-items:center;
-      padding:10px 14px;
-      border-bottom:1px solid var(--border);
-      gap:0;
-    ">
-      <div style="width:36px;flex-shrink:0;font-family:var(--mono);font-size:11px;color:var(--text3);">${s.years}Y</div>
-      <div style="flex:1;font-family:var(--mono);font-size:13px;font-weight:700;color:${xirrCol};text-align:right;padding-right:10px;">${xirr.toFixed(2)}%</div>
-      <div style="width:72px;flex-shrink:0;font-family:var(--mono);font-size:11px;color:var(--text3);text-align:right;padding-right:8px;">₹${fmtAmt(s.invested)}</div>
-      <div style="width:76px;flex-shrink:0;font-family:var(--mono);font-size:12px;font-weight:600;color:${worth>s.invested?'var(--positive)':'var(--negative)'};text-align:right;padding-right:8px;">₹${fmtAmt(worth)}</div>
-      <div style="width:42px;flex-shrink:0;font-family:var(--mono);font-size:10px;color:${multip>=1?'var(--positive)':'var(--negative)'};text-align:right;">${multip.toFixed(2)}x</div>
+    <div style="display:grid;grid-template-columns:${gridCols};align-items:center;padding:5px 14px;border-bottom:1px solid var(--border);min-width:max-content;">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);">${s.years}Y</div>
+      <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:${xirrCol};text-align:right;padding-right:8px;">${xirr.toFixed(2)}%</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:right;padding-right:8px;">₹${fmtAmt(s.invested)}</div>
+      <div style="font-family:var(--mono);font-size:11px;font-weight:600;color:${worth>s.invested?'var(--positive)':'var(--negative)'};text-align:right;padding-right:8px;">₹${fmtAmt(worth)}</div>
+      <div style="font-family:var(--mono);font-size:11px;font-weight:600;color:${gainCol};text-align:right;padding-right:8px;">${gain>=0?'+':''}₹${fmtAmt(Math.abs(gain))}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:${multip>=1?'var(--positive)':'var(--negative)'};text-align:right;">${multip.toFixed(2)}x</div>
       ${hasBench ? `
-      <div style="width:52px;flex-shrink:0;font-family:var(--mono);font-size:10px;color:var(--text3);text-align:right;padding-right:6px;">${bXIRR !== null ? bXIRR.toFixed(1)+'%' : '—'}</div>
-      <div style="width:52px;flex-shrink:0;font-family:var(--mono);font-size:11px;font-weight:700;color:${alphaCol};text-align:right;">${alpha !== null ? (alpha>0?'+':'')+alpha.toFixed(1)+'%' : '—'}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-align:right;padding-right:6px;">${bXIRR !== null ? bXIRR.toFixed(1)+'%' : '—'}</div>
+      <div style="font-family:var(--mono);font-size:10px;font-weight:700;color:${alphaCol};text-align:right;">${alpha !== null ? (alpha>0?'+':'')+alpha.toFixed(1)+'%' : '—'}</div>
       ` : ''}
     </div>`;
   }).join('');
 
+  const hdrCols = hasBench
+    ? '36px 72px 86px 90px 86px 52px 62px 64px'
+    : '36px 72px 86px 90px 86px 52px';
+  const hdrSt = 'font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;';
   const header = `
-    <div style="
-      display:flex;align-items:center;
-      padding:8px 14px;
-      background:var(--surface2);
-      border-bottom:1px solid var(--border);
-      border-radius:var(--radius) var(--radius) 0 0;
-    ">
-      <div style="width:36px;flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;">Yr</div>
-      <div style="flex:1;font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;text-align:right;padding-right:10px;">XIRR</div>
-      <div style="width:72px;flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;text-align:right;padding-right:8px;">Invested</div>
-      <div style="width:76px;flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;text-align:right;padding-right:8px;">Value</div>
-      <div style="width:42px;flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;text-align:right;">Mult</div>
+    <div style="display:grid;grid-template-columns:${hdrCols};align-items:center;padding:6px 14px;background:var(--surface2);border-bottom:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;min-width:max-content;">
+      <div style="${hdrSt}">Yr</div>
+      <div style="${hdrSt}text-align:right;padding-right:8px;">XIRR</div>
+      <div style="${hdrSt}text-align:right;padding-right:8px;">Invested</div>
+      <div style="${hdrSt}text-align:right;padding-right:8px;">Value</div>
+      <div style="${hdrSt}text-align:right;padding-right:8px;">Gain ₹</div>
+      <div style="${hdrSt}text-align:right;">Mult</div>
       ${hasBench ? `
-      <div style="width:52px;flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;text-align:right;padding-right:6px;">Bench</div>
-      <div style="width:52px;flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;text-align:right;">Alpha</div>
+      <div style="${hdrSt}text-align:right;padding-right:6px;">Bench</div>
+      <div style="${hdrSt}color:var(--accent);text-align:right;">Alpha</div>
       ` : ''}
     </div>`;
 
   const pillsHTML = `
-    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;">
       <span style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;align-self:center;white-space:nowrap;">QUICK:</span>
       ${SHARED_BENCH_PILLS.map((p,i) => `
         <button onclick="window._selectBenchPill(${i})"
@@ -2398,7 +2588,7 @@ function renderSIPSection(sipData) {
     </div>`;
 
   const benchBar = `
-    <div style="margin-bottom:16px;">
+    <div style="margin-bottom:10px;">
       ${pillsHTML}
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;">Or search:</div>
@@ -2417,7 +2607,7 @@ function renderSIPSection(sipData) {
 
   return `
     <div style="margin-bottom:6px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
         <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:2px;text-transform:uppercase;">
           SIP RETURNS · ₹10,000/month · Ending today · 1st of month
         </div>
@@ -2427,8 +2617,8 @@ function renderSIPSection(sipData) {
         </div>
       </div>
       ${benchBar}
-      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);">
+      <div>
         ${header}${rows}
       </div>
       </div>
@@ -6263,6 +6453,402 @@ if (window.innerWidth <= 480) {
 
 // Render home screen immediately on script load
 try { renderHomeScreen(); } catch(e) { console.error('renderHomeScreen error:', e); }
+// Prefetch stale fund list in background so filter is ready when user searches
+try { _ensureStaleFilter(); } catch(e) {}
+
+// ─── RISK REPORT GENERATOR ───────────────────────────────
+window.generateRiskReport = function(mode) {
+  if (!selectedFund) { showToast('No fund loaded', 'error'); return; }
+  const navData = navCache[selectedFund.schemeCode];
+  if (!navData) { showToast('Fund data not loaded', 'error'); return; }
+
+  // ── Show benchmark picker modal ──────────────────────────
+  const existing = document.getElementById('rr-bench-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'rr-bench-modal';
+  modal.style.cssText = `position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;`;
+
+  const pillButtons = SHARED_BENCH_PILLS.map((p,i) => `
+    <button id="rrbpill-${i}" onclick="window._rrSelectPill(${i})"
+      style="padding:4px 12px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;
+             border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;"
+      onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+      onmouseout="if(!this.dataset.active){this.style.borderColor='var(--border2)';this.style.color='var(--text3)'}">
+      ${p.label}</button>`).join('');
+
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:24px 28px;width:480px;max-width:95vw;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:12px;">Risk Report — Benchmark (Optional)</div>
+      <div style="font-size:12px;color:var(--text);margin-bottom:16px;">Select a benchmark to include Beta, Alpha, Tracking Error &amp; Correlation in the report. Skip to generate without benchmark.</div>
+
+      <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Quick Select</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">${pillButtons}</div>
+
+      <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Or Search Any Fund / Index</div>
+      <div style="position:relative;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;padding:7px 11px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="rr-bench-search" type="text" placeholder="Type fund or index name…" autocomplete="off"
+            style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:11px;font-family:var(--mono);" />
+        </div>
+        <div id="rr-bench-results" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:300;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
+      </div>
+      <div id="rr-bench-selected" style="font-size:10px;color:var(--accent);font-family:var(--mono);min-height:16px;margin-bottom:16px;"></div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('rr-bench-modal').remove()"
+          style="padding:7px 18px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text3);font-family:var(--mono);font-size:11px;cursor:pointer;">Cancel</button>
+        <button onclick="window._rrSkipBench('${mode}')"
+          style="padding:7px 18px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text);font-family:var(--mono);font-size:11px;cursor:pointer;">Skip — No Benchmark</button>
+        <button id="rr-generate-btn" onclick="window._rrGenerate('${mode}')"
+          style="padding:7px 18px;border-radius:6px;border:none;background:var(--accent);color:#000;font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer;opacity:0.5;" disabled>
+          Generate Report ▶</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+  // State for modal
+  window._rrBenchCode = null;
+  window._rrBenchName = null;
+
+  // Pill selection
+  window._rrSelectPill = function(idx) {
+    const p = SHARED_BENCH_PILLS[idx];
+    window._rrBenchCode = p.code;
+    window._rrBenchName = p.label;
+    SHARED_BENCH_PILLS.forEach((_,i) => {
+      const b = document.getElementById(`rrbpill-${i}`);
+      if (b) { b.style.background = 'transparent'; b.style.color = 'var(--text3)'; b.style.borderColor = 'var(--border2)'; delete b.dataset.active; }
+    });
+    const sel = document.getElementById(`rrbpill-${idx}`);
+    if (sel) { sel.style.background = 'var(--accent)'; sel.style.color = '#000'; sel.style.borderColor = 'var(--accent)'; sel.dataset.active = '1'; }
+    const selDiv = document.getElementById('rr-bench-selected');
+    if (selDiv) selDiv.textContent = '✓ ' + p.label + ' (' + p.code + ')';
+    const btn = document.getElementById('rr-generate-btn');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  };
+
+  // Search wiring
+  const searchInput = document.getElementById('rr-bench-search');
+  const resultsDiv  = document.getElementById('rr-bench-results');
+  let _rrSearchTimer = null;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(_rrSearchTimer);
+    const q = searchInput.value.trim();
+    if (q.length < 2) { resultsDiv.style.display = 'none'; return; }
+    _rrSearchTimer = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://mfapi-proxy.storage4myfile.workers.dev/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        const funds = (data.data || []).slice(0,8);
+        if (!funds.length) { resultsDiv.style.display = 'none'; return; }
+        resultsDiv.innerHTML = funds.map(f => `
+          <div onclick="window._rrPickFund('${f.schemeCode}','${f.schemeName.replace(/'/g,"\'")}')"
+            style="padding:8px 12px;cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--text);border-bottom:1px solid var(--border);"
+            onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background='transparent'">
+            <span style="color:var(--text3);font-size:10px;">${f.schemeCode}</span> · ${f.schemeName}
+          </div>`).join('');
+        resultsDiv.style.display = 'block';
+      } catch(e) { resultsDiv.style.display = 'none'; }
+    }, 280);
+  });
+
+  window._rrPickFund = function(code, name) {
+    window._rrBenchCode = code;
+    window._rrBenchName = name;
+    searchInput.value = name;
+    resultsDiv.style.display = 'none';
+    // Clear pill highlights
+    SHARED_BENCH_PILLS.forEach((_,i) => {
+      const b = document.getElementById(`rrbpill-${i}`);
+      if (b) { b.style.background = 'transparent'; b.style.color = 'var(--text3)'; b.style.borderColor = 'var(--border2)'; delete b.dataset.active; }
+    });
+    const selDiv = document.getElementById('rr-bench-selected');
+    if (selDiv) selDiv.textContent = '✓ ' + name.substring(0,50);
+    const btn = document.getElementById('rr-generate-btn');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  };
+
+  // Skip — generate without benchmark
+  window._rrSkipBench = function(m) {
+    document.getElementById('rr-bench-modal')?.remove();
+    window._benchRiskNavArr = null;
+    window._benchRiskName   = null;
+    window._doGenerateRiskReport(m);
+  };
+
+  // Generate with selected benchmark
+  window._rrGenerate = async function(m) {
+    const code = window._rrBenchCode;
+    const name = window._rrBenchName;
+    if (!code) return;
+    const btn = document.getElementById('rr-generate-btn');
+    if (btn) { btn.textContent = 'Loading…'; btn.disabled = true; }
+    try {
+      const bData = await getNav(code);
+      window._benchRiskNavArr = bData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
+      window._benchRiskName   = name;
+      document.getElementById('rr-bench-modal')?.remove();
+      window._doGenerateRiskReport(m);
+    } catch(e) {
+      if (btn) { btn.textContent = 'Failed — retry'; btn.disabled = false; }
+      showToast('Could not load benchmark data', 'error');
+    }
+  };
+
+  return; // actual report generation happens in _doGenerateRiskReport below
+};
+
+window._doGenerateRiskReport = function(mode) {
+  if (!selectedFund) return;
+  const navData = navCache[selectedFund.schemeCode];
+  if (!navData) return;
+  const navArr = navData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
+  const meta   = navData.meta || {};
+  const risk   = calcRisk(navArr);
+  const rolling = calcRolling(navArr);
+  const today  = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'});
+  const inception = navArr[0] ? navArr[0].date.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}) : '—';
+  const ageYears = navArr[0] ? ((navArr[navArr.length-1].date - navArr[0].date)/(365.25*86400000)).toFixed(1) : '—';
+  const latestNAV = navArr[navArr.length-1];
+  const benchName = window._benchRiskName || '—';
+
+  const fmtR = v => v != null && isFinite(v) ? v.toFixed(2) : '—';
+  const riskColor = v => v == null ? '#666' : v > 0 ? '#16a34a' : '#dc2626';
+  const ratioColor = v => v == null ? '#666' : v > 1 ? '#16a34a' : v > 0 ? '#d97706' : '#dc2626';
+
+  // Risk interpretation helpers
+  const ddRating = risk ? (risk.maxDD > -15 ? 'Low' : risk.maxDD > -30 ? 'Moderate' : risk.maxDD > -50 ? 'High' : 'Very High') : '—';
+  const volRating = risk ? (risk.stdAnnual < 10 ? 'Low' : risk.stdAnnual < 18 ? 'Moderate' : risk.stdAnnual < 25 ? 'High' : 'Very High') : '—';
+  const sharpeRating = risk ? (risk.sharpe > 1.5 ? 'Excellent' : risk.sharpe > 1 ? 'Good' : risk.sharpe > 0.5 ? 'Average' : 'Poor') : '—';
+
+  const rollingRows = rolling.map(r => `
+    <tr>
+      <td>${r.years}Y</td>
+      <td>${r.count} periods</td>
+      <td style="color:${r.posPct>=75?'#16a34a':r.posPct>=50?'#d97706':'#dc2626'};font-weight:600;">${r.posPct.toFixed(1)}%</td>
+      <td style="color:#dc2626;">${fmtR(r.min)}%</td>
+      <td style="color:#16a34a;">${fmtR(r.max)}%</td>
+      <td style="font-weight:600;">${r.posPct>=75?'✓ Consistent':'⚠ Variable'}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Risk Report — ${meta.scheme_name || selectedFund.schemeName}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1a1a1a; background: #fff; padding: 32px; max-width: 900px; margin: 0 auto; }
+  @media print {
+    body { padding: 16px; }
+    .no-print { display: none !important; }
+    @page { margin: 15mm; size: A4; }
+  }
+  .header { border-bottom: 3px solid #1a1a1a; padding-bottom: 16px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:flex-start; }
+  .header-left h1 { font-size: 18px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px; }
+  .header-left p { font-size: 11px; color: #555; }
+  .header-right { text-align:right; font-size: 10px; color: #555; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600; margin-right:4px; margin-top:4px; }
+  .badge-blue { background:#dbeafe; color:#1d4ed8; }
+  .badge-green { background:#dcfce7; color:#15803d; }
+  .badge-amber { background:#fef3c7; color:#92400e; }
+  .section { margin-bottom: 24px; }
+  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #555; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 14px; }
+  .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .meta-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; }
+  .meta-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
+  .meta-val { font-size: 14px; font-weight: 700; color: #1a1a1a; }
+  .meta-sub { font-size: 10px; color: #888; margin-top: 2px; }
+  .risk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .risk-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px; }
+  .risk-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 6px; }
+  .risk-val { font-size: 22px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .risk-sub { font-size: 10px; color: #888; }
+  .risk-rating { display:inline-block; font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 4px; margin-top:4px; }
+  .rating-low { background:#dcfce7; color:#15803d; }
+  .rating-mod { background:#fef3c7; color:#92400e; }
+  .rating-high { background:#fee2e2; color:#991b1b; }
+  .rating-good { background:#dcfce7; color:#15803d; }
+  .rating-avg { background:#fef3c7; color:#92400e; }
+  .rating-poor { background:#fee2e2; color:#991b1b; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #f9fafb; padding: 8px 10px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #555; border-bottom: 2px solid #e5e7eb; }
+  td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; }
+  tr:last-child td { border-bottom: none; }
+  .bench-section { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px; }
+  .disclaimer { border: 1px solid #d1d5db; border-radius: 6px; padding: 16px; background: #f9fafb; font-size: 10px; color: #4b5563; line-height: 1.7; margin-top: 24px; }
+  .disclaimer-title { font-size: 11px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+  .print-btn { background: #1a1a1a; color: #fff; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 8px; }
+  .print-btn:hover { background: #333; }
+  .watermark { text-align:center; font-size:10px; color:#ccc; margin-top:16px; letter-spacing:1px; }
+</style>
+</head>
+<body>
+
+<!-- Print/Download buttons -->
+<div class="no-print" style="margin-bottom:20px;padding:12px 16px;background:#f9fafb;border-radius:6px;display:flex;gap:8px;align-items:center;">
+  <button class="print-btn" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span style="font-size:11px;color:#888;">To save as PDF: Print → Destination → Save as PDF</span>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <h1>${meta.scheme_name || selectedFund.schemeName}</h1>
+    <p>${meta.fund_house || ''} · Code: ${selectedFund.schemeCode}</p>
+    <div style="margin-top:6px;">
+      ${meta.scheme_category ? `<span class="badge badge-blue">${meta.scheme_category}</span>` : ''}
+      ${meta.scheme_type ? `<span class="badge badge-green">${meta.scheme_type}</span>` : ''}
+      <span class="badge badge-amber">Risk Report Only</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div style="font-weight:600;">Report Date</div>
+    <div>${today}</div>
+    ${meta.scheme_isin_growth ? `<div style="margin-top:4px;">ISIN: ${meta.scheme_isin_growth}</div>` : ''}
+  </div>
+</div>
+
+<!-- Fund Overview -->
+<div class="section">
+  <div class="section-title">Fund Overview</div>
+  <div class="meta-grid">
+    <div class="meta-box">
+      <div class="meta-label">Inception Date</div>
+      <div class="meta-val" style="font-size:13px;">${inception}</div>
+      <div class="meta-sub">${ageYears} years old</div>
+    </div>
+    <div class="meta-box">
+      <div class="meta-label">Latest NAV Date</div>
+      <div class="meta-val" style="font-size:13px;">${latestNAV ? latestNAV.date.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div>
+      <div class="meta-sub">NAV data points: ${navArr.length}</div>
+    </div>
+    <div class="meta-box">
+      <div class="meta-label">Benchmark</div>
+      <div class="meta-val" style="font-size:11px;line-height:1.3;">${benchName}</div>
+      <div class="meta-sub">${risk?.beta != null ? 'Beta vs benchmark available' : 'No benchmark selected'}</div>
+    </div>
+    <div class="meta-box">
+      <div class="meta-label">Volatility Rating</div>
+      <div class="meta-val" style="font-size:16px;">${volRating}</div>
+      <div class="meta-sub">Based on annualised std dev</div>
+    </div>
+  </div>
+</div>
+
+<!-- Core Risk Metrics -->
+<div class="section">
+  <div class="section-title">Core Risk Metrics</div>
+  <div class="risk-grid">
+    <div class="risk-box">
+      <div class="risk-label">Annualised Std Deviation</div>
+      <div class="risk-val" style="color:#1a1a1a;">${risk ? risk.stdAnnual.toFixed(2)+'%' : '—'}</div>
+      <div class="risk-sub">Measure of return volatility</div>
+      <span class="risk-rating ${volRating==='Low'?'rating-low':volRating==='Moderate'?'rating-mod':'rating-high'}">${volRating}</span>
+    </div>
+    <div class="risk-box">
+      <div class="risk-label">Downside Deviation</div>
+      <div class="risk-val" style="color:#dc2626;">${risk ? risk.dsDevAnnual.toFixed(2)+'%' : '—'}</div>
+      <div class="risk-sub">Volatility of negative returns only</div>
+    </div>
+    <div class="risk-box">
+      <div class="risk-label">Maximum Drawdown</div>
+      <div class="risk-val" style="color:#dc2626;">${risk ? risk.maxDD.toFixed(2)+'%' : '—'}</div>
+      <div class="risk-sub">Worst peak-to-trough decline</div>
+      <span class="risk-rating ${ddRating==='Low'?'rating-low':ddRating==='Moderate'?'rating-mod':'rating-high'}">${ddRating} Drawdown Risk</span>
+    </div>
+    <div class="risk-box">
+      <div class="risk-label">Sharpe Ratio</div>
+      <div class="risk-val" style="color:${risk?ratioColor(risk.sharpe):'#666'};">${fmtR(risk?.sharpe)}</div>
+      <div class="risk-sub">Risk-adjusted return (Rf = 6.5%)</div>
+      <span class="risk-rating ${sharpeRating==='Excellent'||sharpeRating==='Good'?'rating-good':sharpeRating==='Average'?'rating-avg':'rating-poor'}">${sharpeRating}</span>
+    </div>
+    <div class="risk-box">
+      <div class="risk-label">Sortino Ratio</div>
+      <div class="risk-val" style="color:${risk?ratioColor(risk.sortino):'#666'};">${fmtR(risk?.sortino)}</div>
+      <div class="risk-sub">Downside risk-adjusted return</div>
+    </div>
+    <div class="risk-box">
+      <div class="risk-label">Beta</div>
+      <div class="risk-val" style="color:#1a1a1a;">${fmtR(risk?.beta)}</div>
+      <div class="risk-sub">Market sensitivity vs benchmark</div>
+      ${risk?.beta != null ? `<span class="risk-rating ${Math.abs(risk.beta-1)<0.2?'rating-good':Math.abs(risk.beta-1)<0.4?'rating-avg':'rating-poor'}">${risk.beta < 0.8 ? 'Defensive' : risk.beta > 1.2 ? 'Aggressive' : 'Market-Like'}</span>` : ''}
+    </div>
+  </div>
+</div>
+
+<!-- Benchmark Relative Risk (if available) -->
+${risk?.alpha != null ? `
+<div class="section">
+  <div class="section-title">Benchmark Relative Risk · vs ${benchName}</div>
+  <div class="bench-section">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
+      <div>
+        <div class="meta-label">Alpha (Jensen's)</div>
+        <div style="font-size:18px;font-weight:700;color:${riskColor(risk.alpha)};">${fmtR(risk.alpha)}%</div>
+        <div class="meta-sub">Excess return vs expected</div>
+      </div>
+      <div>
+        <div class="meta-label">Tracking Error</div>
+        <div style="font-size:18px;font-weight:700;">${fmtR(risk.trackingError)}%</div>
+        <div class="meta-sub">Deviation from benchmark</div>
+      </div>
+      <div>
+        <div class="meta-label">Information Ratio</div>
+        <div style="font-size:18px;font-weight:700;color:${risk.infoRatio!=null?ratioColor(risk.infoRatio):'#666'};">${fmtR(risk.infoRatio)}</div>
+        <div class="meta-sub">Active return per unit of tracking error</div>
+      </div>
+      <div>
+        <div class="meta-label">Correlation</div>
+        <div style="font-size:18px;font-weight:700;">${fmtR(risk.correlation)}</div>
+        <div class="meta-sub">Return correlation to benchmark</div>
+      </div>
+    </div>
+  </div>
+</div>` : ''}
+
+<!-- Rolling Consistency -->
+${rolling.length ? `
+<div class="section">
+  <div class="section-title">Return Consistency (Rolling Risk Analysis)</div>
+  <p style="font-size:10px;color:#888;margin-bottom:10px;">% of rolling periods with positive returns — higher = more consistent risk-adjusted behaviour</p>
+  <table>
+    <thead><tr><th>Window</th><th>Periods Analysed</th><th>% Positive Periods</th><th>Worst Period</th><th>Best Period</th><th>Consistency</th></tr></thead>
+    <tbody>${rollingRows}</tbody>
+  </table>
+</div>` : ''}
+
+<!-- SEBI Disclaimer -->
+<div class="disclaimer" style="text-align:center;">
+  <p style="font-weight:600;color:#1a1a1a;">Mutual fund investments are subject to market risks, read all scheme related documents carefully.</p>
+</div>
+
+<div class="watermark">Generated via VED Investment · MF Research Tool · ${today}</div>
+
+</body>
+</html>`;
+
+  if (mode === 'print') {
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  } else {
+    // Download as HTML (save as PDF from browser)
+    const blob = new Blob([html], { type: 'text/html' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Risk_Report_${(meta.scheme_name || selectedFund.schemeName).replace(/[^a-zA-Z0-9]/g,'_').substring(0,40)}_${new Date().toISOString().split('T')[0]}.html`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('Report downloaded — open in browser and Print → Save as PDF', '');
+  }
+};
 
 // ─── EXPORT FUNCTIONS ────────────────────────────────────────────────────────────────────────────────────
 function tableToData(tableId) {
@@ -6419,6 +7005,249 @@ setVal('stepupStart', oneYearAgoStr);
 setVal('stepupEnd', todayStr);
 setVal('chartFrom', oneYearAgoStr);
 setVal('chartTo', todayStr);
+
+// ══════════════════════════════════════════════════════
+// CATEGORY SIP RANKER
+// ══════════════════════════════════════════════════════
+let _csrBenchCode = null;
+let _csrBenchName = null;
+
+window._csrSelectPill = function(idx) {
+  const p = SHARED_BENCH_PILLS[idx];
+  _csrBenchCode = p.code;
+  _csrBenchName = p.label;
+  SHARED_BENCH_PILLS.forEach((_,i) => {
+    const b = document.getElementById(`csrpill-${i}`);
+    if (!b) return;
+    b.style.background = 'transparent';
+    b.style.color = 'var(--text3)';
+    b.style.borderColor = 'var(--border2)';
+  });
+  const sel = document.getElementById(`csrpill-${idx}`);
+  if (sel) { sel.style.background = 'var(--accent)'; sel.style.color = '#000'; sel.style.borderColor = 'var(--accent)'; }
+  const lbl = document.getElementById('csr-bench-label');
+  if (lbl) lbl.textContent = '✓ ' + p.label;
+};
+
+window.runCSR = async function() {
+  const catKeyword = document.getElementById('csr-category')?.value;
+  const plan       = document.getElementById('csr-plan')?.value;
+  const years      = parseInt(document.getElementById('csr-period')?.value || '3');
+  const amt        = parseFloat(document.getElementById('csr-amount')?.value || '10000');
+  const statusEl   = document.getElementById('csr-status');
+  const resultEl   = document.getElementById('csr-result');
+
+  if (!catKeyword) { showToast('Pick a category', 'error'); return; }
+  if (isNaN(amt) || amt <= 0) { showToast('Enter a valid SIP amount', 'error'); return; }
+
+  statusEl.textContent = 'Loading fund list…';
+  resultEl.innerHTML = `<div class="loading-wrap" style="padding:30px 0;"><div class="spinner"></div><span style="font-family:var(--mono);font-size:12px;">Fetching fund list…</span></div>`;
+
+  // 1. Load allFunds if needed
+  if (allFunds.length === 0) {
+    try {
+      const r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf');
+      allFunds = await r.json();
+    } catch(e) { showToast('Could not load fund list', 'error'); resultEl.innerHTML = ''; statusEl.textContent = ''; return; }
+  }
+
+  // 2. Filter by category keyword + plan type + stale filter
+  let funds = allFunds
+    .filter(f => f.schemeName.toLowerCase().includes(catKeyword))
+    .map(f => ({ ...f, planType: detectPlanType(f.schemeName) }))
+    .filter(f => f.planType === plan);
+
+  if (_staleCodes && _staleCodes.size > 0)
+    funds = funds.filter(f => !_staleCodes.has(String(f.schemeCode)));
+
+  if (!funds.length) {
+    resultEl.innerHTML = `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:16px;">No funds found for this combination.</div>`;
+    statusEl.textContent = '';
+    return;
+  }
+
+  // 3. Date range — end = today, start = exactly N years ago
+  const endDate   = new Date();
+  const startDate = new Date(endDate);
+  startDate.setFullYear(startDate.getFullYear() - years);
+
+  // Override with custom dates if provided
+  const customStart = document.getElementById('csr-start')?.value;
+  const customEnd   = document.getElementById('csr-end')?.value;
+  if (customStart) { const d = new Date(customStart); if (!isNaN(d)) startDate.setTime(d.getTime()); }
+  if (customEnd)   { const d = new Date(customEnd);   if (!isNaN(d)) endDate.setTime(d.getTime()); }
+
+  // 4. Load benchmark NAV if selected
+  let benchNavArr = null;
+  let benchXIRR   = null;
+  if (_csrBenchCode) {
+    statusEl.textContent = `Loading benchmark…`;
+    try {
+      const bd = await getNav(_csrBenchCode);
+      benchNavArr = bd.data.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) })).filter(n => !isNaN(n.nav)).reverse();
+      const bCFs = buildSIPCashflows(benchNavArr, startDate, endDate, amt, 'monthly');
+      if (bCFs.length >= 3) {
+        benchXIRR = calcXIRR(bCFs); // already includes redemption
+      }
+    } catch(e) { benchNavArr = null; benchXIRR = null; }
+  }
+
+  // 5. Process funds with concurrency limit of 5
+  const total   = funds.length;
+  let   done    = 0;
+  const results = [];
+  const CONC    = 5;
+
+  statusEl.textContent = `0 / ${total} funds loaded…`;
+
+  for (let i = 0; i < funds.length; i += CONC) {
+    const batch = funds.slice(i, i + CONC);
+    await Promise.all(batch.map(async f => {
+      try {
+        const nd     = await getNav(f.schemeCode);
+        const navArr = nd.data.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) })).filter(n => !isNaN(n.nav)).reverse();
+        if (!navArr.length || navArr[0].date > startDate) { done++; return; }
+
+        // buildSIPCashflows already appends redemption at last NAV date
+        const cfs = buildSIPCashflows(navArr, startDate, endDate, amt, 'monthly');
+        if (cfs.length < 3) { done++; return; } // need at least 2 instalments + redemption
+
+        const xirr = calcXIRR(cfs); // use cfs directly — already has redemption
+        if (isNaN(xirr) || !isFinite(xirr)) { done++; return; }
+
+        // Invested = sum of negative cashflows, Worth = redemption cashflow
+        const invested = cfs.filter(c => c.amount < 0).reduce((s, c) => s + Math.abs(c.amount), 0);
+        const worth    = cfs[cfs.length - 1].amount; // last cashflow is redemption
+        const gain     = worth - invested;
+        const alpha    = (benchXIRR !== null && !isNaN(benchXIRR)) ? (xirr - benchXIRR) : null;
+        const instals  = cfs.length - 1; // exclude redemption cashflow
+
+        results.push({ name: f.schemeName, code: f.schemeCode, xirr, invested, worth, gain, alpha, cfs: instals });
+      } catch(e) {}
+      done++;
+      statusEl.textContent = `${done} / ${total} funds loaded…`;
+    }));
+  }
+
+  if (!results.length) {
+    resultEl.innerHTML = `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:16px;">Not enough history for any fund in this category for ${years}Y period.</div>`;
+    statusEl.textContent = '';
+    return;
+  }
+
+  results.sort((a, b) => b.xirr - a.xirr);
+
+  const fmtA      = v => v >= 10000000 ? (v/10000000).toFixed(2)+' Cr' : v >= 100000 ? (v/100000).toFixed(2)+' L' : (v/1000).toFixed(1)+' K';
+  const planLabel = plan === 'direct_growth' ? 'Direct Growth' : 'Regular Growth';
+  const catLabel  = document.getElementById('csr-category')?.options[document.getElementById('csr-category')?.selectedIndex]?.text || catKeyword;
+  const hasBench  = benchXIRR !== null;
+
+  const avgXIRR    = results.reduce((s,r) => s + r.xirr, 0) / results.length;
+  const avgWorth   = results.reduce((s,r) => s + r.worth, 0) / results.length;
+  const avgGain    = results.reduce((s,r) => s + r.gain, 0) / results.length;
+  const avgInvested = results[0].invested;
+  const avgAlpha   = hasBench ? (avgXIRR - benchXIRR) : null;
+
+  const hdrSt  = `font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;padding:7px 10px;text-align:right;border-bottom:2px solid var(--border2);white-space:nowrap;background:var(--surface2);`;
+  const hdrStL = hdrSt.replace('text-align:right','text-align:left');
+  const tdSt   = `font-family:var(--mono);font-size:11px;padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;`;
+  const tdStL  = tdSt.replace('text-align:right','text-align:left');
+
+  const row = (r, rank) => {
+    const xirrCol  = r.xirr >= 12 ? 'var(--positive)' : r.xirr >= 0 ? 'var(--accent)' : 'var(--negative)';
+    const gainCol  = r.gain >= 0 ? 'var(--positive)' : 'var(--negative)';
+    const alphaCol = r.alpha !== null ? (r.alpha > 0 ? 'var(--positive)' : r.alpha < 0 ? 'var(--negative)' : 'var(--text3)') : 'var(--text3)';
+    const shortName = r.name
+      .replace(/\s*[-–]\s*(direct|regular)\s*(plan)?\s*[-–]?\s*(growth|idcw|dividend|gr|growth option|idcw option)?\.?\s*$/gi, '')
+      .replace(/\s*[-–]\s*(growth option|growth|idcw|dividend)\s*$/gi, '')
+      .replace(/\s*[-–]\s*(plan)?\s*[-–]?\s*(growth|idcw)?\s*$/gi, '')
+      .replace(/\bfund\b/gi, 'Fd')
+      .replace(/\btax saver\b/gi, 'TS')
+      .replace(/\bflexicap\b|\bflexi cap\b/gi, 'FlexiCap')
+      .replace(/\blarge\s*&?\s*mid\s*cap\b/gi, 'L&M')
+      .replace(/\blarge\s*cap\b/gi, 'LargeCap')
+      .replace(/\bmid\s*cap\b/gi, 'MidCap')
+      .replace(/\bsmall\s*cap\b/gi, 'SmallCap')
+      .replace(/\bmulti\s*cap\b/gi, 'MultiCap')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return `<tr style="cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'"
+      onclick="window.csrOpenFund(${r.code})">
+      <td style="${tdSt}text-align:center;color:var(--text3);font-size:10px;">${rank}</td>
+      <td style="${tdStL}">
+        <div style="font-size:11px;color:var(--text);font-weight:500;line-height:1.3;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.name}">${shortName}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:1px;">${r.code} · ${r.cfs} instalments</div>
+      </td>
+      <td style="${tdSt}font-size:13px;font-weight:700;color:${xirrCol};">${r.xirr.toFixed(2)}%</td>
+      <td style="${tdSt}color:var(--text3);">₹${fmtA(r.invested)}</td>
+      <td style="${tdSt}font-weight:600;color:${r.worth > r.invested ? 'var(--positive)' : 'var(--negative)'};">₹${fmtA(r.worth)}</td>
+      <td style="${tdSt}color:${gainCol};">${r.gain>=0?'+':'−'}₹${fmtA(Math.abs(r.gain))}</td>
+      ${hasBench ? `<td style="${tdSt}font-weight:700;color:${alphaCol};">${r.alpha !== null ? (r.alpha>0?'+':'')+r.alpha.toFixed(2)+'%' : '—'}</td>` : ''}
+    </tr>`;
+  };
+
+  const avgAlphaCol = avgAlpha !== null ? (avgAlpha > 0 ? 'var(--positive)' : avgAlpha < 0 ? 'var(--negative)' : 'var(--text3)') : 'var(--text3)';
+  const avgRow = `<tr style="background:rgba(255,255,255,0.03);">
+    <td style="${tdSt}text-align:center;color:var(--text3);">—</td>
+    <td style="${tdStL}font-style:italic;font-weight:600;color:var(--text);">Category Average (${results.length} funds)</td>
+    <td style="${tdSt}font-weight:700;color:var(--accent);">${avgXIRR.toFixed(2)}%</td>
+    <td style="${tdSt}color:var(--text3);">₹${fmtA(avgInvested)}</td>
+    <td style="${tdSt}font-weight:600;color:var(--positive);">₹${fmtA(avgWorth)}</td>
+    <td style="${tdSt}color:var(--positive);">+₹${fmtA(Math.abs(avgGain))}</td>
+    ${hasBench ? `<td style="${tdSt}font-weight:700;color:${avgAlphaCol};">${avgAlpha !== null ? (avgAlpha>0?'+':'')+avgAlpha.toFixed(2)+'%' : '—'}</td>` : ''}
+  </tr>`;
+
+  const benchRow = hasBench ? `<tr style="background:rgba(232,170,46,0.06);">
+    <td style="${tdSt}text-align:center;color:var(--text3);">—</td>
+    <td style="${tdStL}font-weight:600;color:var(--accent);">${_csrBenchName} (Benchmark)</td>
+    <td style="${tdSt}font-weight:700;color:var(--accent);">${benchXIRR.toFixed(2)}%</td>
+    <td style="${tdSt}color:var(--text3);">₹${fmtA(avgInvested)}</td>
+    <td style="${tdSt}color:var(--text3);">—</td>
+    <td style="${tdSt}color:var(--text3);">—</td>
+    <td style="${tdSt}color:var(--text3);">—</td>
+  </tr>` : '';
+
+  resultEl.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);">
+        <span style="color:var(--accent);font-weight:700;">${catLabel}</span>
+        · ${planLabel} · ${years}Y SIP · ₹${(amt/1000).toFixed(0)}K/mo
+        · <span style="color:var(--positive);">${results.length} funds</span>
+        ${hasBench ? `· vs <span style="color:var(--accent);">${_csrBenchName}</span>` : ''}
+      </div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--text3);">
+        ${startDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} → ${endDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}
+      </div>
+    </div>
+    <div style="overflow-x:auto;border:1px solid var(--border2);border-radius:var(--radius-lg);">
+      <table style="width:100%;border-collapse:collapse;min-width:480px;">
+        <thead><tr>
+          <th style="${hdrSt}text-align:center;">#</th>
+          <th style="${hdrStL}">Fund</th>
+          <th style="${hdrSt}">XIRR</th>
+          <th style="${hdrSt}">Invested</th>
+          <th style="${hdrSt}">Value</th>
+          <th style="${hdrSt}">Gain</th>
+          ${hasBench ? `<th style="${hdrSt}color:var(--accent);">Alpha</th>` : ''}
+        </tr></thead>
+        <tbody>
+          ${results.map((r, i) => row(r, i + 1)).join('')}
+          ${avgRow}
+          ${benchRow}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:8px;font-size:9px;font-family:var(--mono);color:var(--text3);">
+      * XIRR via Newton-Raphson · Monthly SIP on 1st of month · Click any row to open fund · Alpha = Fund XIRR − Benchmark XIRR
+    </div>`;
+
+  statusEl.textContent = `✓ ${results.length} funds ranked`;
+};
+
+window.csrOpenFund = function(code) {
+  const match = allFunds.find(f => String(f.schemeCode) === String(code));
+  if (match) { selectedFund = match; loadFund(match); switchPage('fund'); }
+};
 </script>
 </body>
 </html>
