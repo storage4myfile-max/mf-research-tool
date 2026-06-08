@@ -1929,13 +1929,24 @@ function renderSearchResults(results) {
   const el = document.getElementById('searchResults');
   if (!results.length) { el.style.display = 'none'; return; }
   el.innerHTML = results.map(f => `
-    <div class="search-result-item" onclick="addToWatchlist('${f.schemeCode}', \`${f.schemeName.replace(/`/g,"'")}\`)">
+    <div class="search-result-item" onclick="window._searchSelectFund('${f.schemeCode}', \`${f.schemeName.replace(/`/g,"'")}\`)">
       <div class="result-name">${f.schemeName}</div>
       <div class="result-meta">${f.schemeCode}</div>
     </div>
   `).join('');
   el.style.display = 'block';
 }
+
+window._searchSelectFund = async function(code, name) {
+  document.getElementById('searchResults').style.display = 'none';
+  document.getElementById('searchInput').value = '';
+  // Load fund immediately
+  loadFund(code, name);
+  // Also add to watchlist silently
+  try {
+    await setDoc(doc(db, 'watchlist', String(code)), { schemeCode: code, schemeName: name, addedAt: Date.now() });
+  } catch(e) {}
+};
 
 // ─── WATCHLIST ───────────────────────────────────────────
 window.addToWatchlist = async function(code, name) {
@@ -6423,7 +6434,7 @@ async function renderHomeScreen() {
       if (!results.length) { res.style.display = 'none'; return; }
       res.innerHTML = results.slice(0, 10).map((f, i) => `
         <div
-          onclick="loadFund('${f.schemeCode}','${f.schemeName.replace(/'/g,"\\'")}'); document.getElementById('heroSearchInput').value=''; document.getElementById('heroSearchResults').style.display='none';"
+          onmousedown="loadFund('${f.schemeCode}','${f.schemeName.replace(/'/g,"\\'")}'); document.getElementById('heroSearchInput').value=''; document.getElementById('heroSearchResults').style.display='none';"
           style="
             padding:12px 18px;cursor:pointer;transition:background 0.12s;
             ${i < results.slice(0,10).length - 1 ? 'border-bottom:1px solid var(--border);' : ''}
