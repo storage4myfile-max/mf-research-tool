@@ -2482,7 +2482,9 @@ function calcSIPYearly(navArr) {
     const cashflows = buildSIPCashflows(navArr, startDate, latest.date, 10000);
     if (cashflows.length < 3) continue;
     const xirr = calcXIRR(cashflows);
-    results.push({ years: y, xirr, invested: cashflows.filter(c => c.amount < 0).length * 10000 });
+    const invested = cashflows.filter(c => c.amount < 0).length * 10000;
+    const worth = cashflows[cashflows.length - 1].amount; // actual redemption value
+    results.push({ years: y, xirr, invested, worth });
   }
 
   return results;
@@ -2536,7 +2538,7 @@ function renderSIPSection(sipData) {
   };
 
   const rows = sipData.map((s, i) => {
-    const worth   = s.invested * Math.pow(1 + (s.xirr||0)/100, s.years);
+    const worth   = s.worth;
     const multip  = worth / s.invested;
     const xirr    = s.xirr || 0;
     const xirrCol = xirr > 15 ? 'var(--positive)' : xirr > 8 ? 'var(--accent)' : xirr > 0 ? 'var(--saffron)' : 'var(--negative)';
