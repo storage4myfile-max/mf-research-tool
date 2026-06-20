@@ -7067,8 +7067,26 @@ window.runCSR = async function() {
   }
 
   // 2. Filter by category keyword + plan type + stale filter
+  // Category exclusion rules — prevent overlap between similar categories
+  const CAT_EXCLUDE = {
+    'mid cap':       ['large & mid', 'large and mid', 'largемид', 'l&m'],
+    'large cap':     ['large & mid', 'large and mid', 'multi cap', 'flexi'],
+    'small cap':     ['large & mid', 'mid cap'],
+    'flexi cap':     ['multi cap'],
+    'value fund':    ['contra'],
+    'contra':        ['value fund'],
+    'sectoral':      [],
+    'thematic':      [],
+  };
+  const excludeTerms = CAT_EXCLUDE[catKeyword] || [];
+
   let funds = allFunds
-    .filter(f => f.schemeName.toLowerCase().includes(catKeyword))
+    .filter(f => {
+      const n = f.schemeName.toLowerCase();
+      if (!n.includes(catKeyword)) return false;
+      for (const ex of excludeTerms) { if (n.includes(ex)) return false; }
+      return true;
+    })
     .map(f => ({ ...f, planType: detectPlanType(f.schemeName) }))
     .filter(f => f.planType === plan);
 
