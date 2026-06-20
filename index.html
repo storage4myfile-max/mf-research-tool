@@ -1022,6 +1022,13 @@
         Search and add funds
       </div>
     </div>
+    <!-- Changelog button at sidebar bottom -->
+    <div style="padding:10px 14px;border-top:1px solid var(--border);margin-top:auto;">
+      <button onclick="window.openChangelog()" style="width:100%;background:transparent;border:1px solid var(--border2);border-radius:6px;padding:7px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text3);font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text3)'">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Changelog
+      </button>
+    </div>
   </div>
 
   <!-- MAIN -->
@@ -7067,24 +7074,39 @@ window.runCSR = async function() {
   }
 
   // 2. Filter by category keyword + plan type + stale filter
-  // Category exclusion rules — prevent overlap between similar categories
   const CAT_EXCLUDE = {
-    'mid cap':       ['large & mid', 'large and mid', 'largемид', 'l&m'],
+    'mid cap':       ['large & mid', 'large and mid', 'l&m'],
     'large cap':     ['large & mid', 'large and mid', 'multi cap', 'flexi'],
-    'small cap':     ['large & mid', 'mid cap'],
+    'small cap':     ['large & mid', 'mid cap', 'midcap'],
     'flexi cap':     ['multi cap'],
     'value fund':    ['contra'],
     'contra':        ['value fund'],
     'sectoral':      [],
     'thematic':      [],
   };
+
+  // Spelling variants for each category keyword
+  const CAT_ALIASES = {
+    'mid cap':    ['mid cap', 'midcap'],
+    'large cap':  ['large cap', 'largecap'],
+    'small cap':  ['small cap', 'smallcap'],
+    'flexi cap':  ['flexi cap', 'flexicap'],
+    'large & mid':['large & mid', 'large and mid'],
+    'multi cap':  ['multi cap', 'multicap'],
+  };
+
+  // Always exclude ETFs, Index funds, FoFs from active fund categories
+  const ALWAYS_EXCLUDE = ['etf', 'index', ' nifty ', ' sensex ', 'fund of fund', ' fof ', 'feeder', 'exchange traded', 'series 1', 'series 2', 'series 3', 'series 4', 'series 5', 'series 6', 'series 7', 'series 8', 'series 9', ' - sr ', 'close ended', 'closed ended', 'idcw', 'dividend', 'payout', 'bonus option', 'bonus plan'];
+
   const excludeTerms = CAT_EXCLUDE[catKeyword] || [];
+  const matchTerms   = CAT_ALIASES[catKeyword] || [catKeyword];
 
   let funds = allFunds
     .filter(f => {
       const n = f.schemeName.toLowerCase();
-      if (!n.includes(catKeyword)) return false;
+      if (!matchTerms.some(m => n.includes(m))) return false;
       for (const ex of excludeTerms) { if (n.includes(ex)) return false; }
+      for (const ex of ALWAYS_EXCLUDE) { if (n.includes(ex)) return false; }
       return true;
     })
     .map(f => ({ ...f, planType: detectPlanType(f.schemeName) }))
@@ -7280,6 +7302,122 @@ window.runCSR = async function() {
 window.csrOpenFund = function(code) {
   const match = allFunds.find(f => String(f.schemeCode) === String(code));
   if (match) { selectedFund = match; loadFund(match); switchPage('fund'); }
+};
+
+// ══════════════════════════════════════════════════════
+// CHANGELOG
+// ══════════════════════════════════════════════════════
+const CHANGELOG = [
+  {
+    version: 'v1.9', date: 'Jun 2026', label: 'latest',
+    changes: [
+      'Category SIP Ranker added inside SIP Calc tab — rank all funds in a category by XIRR with Alpha vs benchmark',
+      'Nifty 500 Multicap (152778) added as 7th benchmark pill across all tabs',
+      'Stale fund filter (90-day rule) — funds with no NAV in 90+ days excluded from all searches',
+      'Benchmark picker modal added to Risk Report — select benchmark before generating PDF/HTML',
+      'Risk Report disclaimer replaced with single statutory line',
+      'Fund SIP ladder: Value & Gain columns added; switched to CSS grid layout for compact display',
+      'Category SIP Ranker: custom start/end date pickers; 1–15 year period options; aggressive name shortening',
+      'Mid Cap ranker now correctly excludes Large & Mid Cap funds',
+      'Home screen search: fixed blur-vs-click race condition (onclick → onmousedown)',
+      'SIP Value/Gain bug fixed — was using CAGR approximation; now uses actual redemption cashflow',
+    ]
+  },
+  {
+    version: 'v1.8', date: 'May 2026',
+    changes: [
+      'Rolling Returns: Lump Sum + SIP rolling toggle with benchmark comparison',
+      'Step-Up SIP tab — annual step-up vs flat SIP comparison with benchmark',
+      'SIP frequency options: Daily / Weekly / Fortnightly / Monthly / Quarterly / Half-Yearly',
+      'Benchmark quick-select pills added to all calc tabs (shared SHARED_BENCH_PILLS system)',
+      'Risk Report generator — Print / Download HTML with SEBI disclaimer, no return figures',
+      'Cat Heatmap tab — monthly return heatmap by category with sticky fund column',
+    ]
+  },
+  {
+    version: 'v1.7', date: 'Apr 2026',
+    changes: [
+      'Scorecard tab — trailing + risk + rolling + alpha sortable table across all funds',
+      'Correlation matrix tab — pairwise correlation between any funds',
+      'Goal Calc tab — target corpus → required SIP with scenario table',
+      'Lump+SIP tab — custom cashflow builder (multiple lumps + SIP legs)',
+      'Category Scan tab — SEBI category scanner with heatmap and avg return column',
+    ]
+  },
+  {
+    version: 'v1.6', date: 'Mar 2026',
+    changes: [
+      'Chart Compare tab — multi-fund NAV chart indexed to base-100',
+      'PTP Calc tab — multi-fund point-to-point returns with benchmark pills',
+      'SIP Calc tab — multi-fund SIP XIRR calculator',
+      'Compare tab — watchlist compare + AMC compare',
+    ]
+  },
+  {
+    version: 'v1.5', date: 'Feb 2026',
+    changes: [
+      'Fund tab: PTP trailing returns ladder (1Y–13Y)',
+      'Fund tab: SIP ladder with benchmark comparison',
+      'Fund tab: Rolling returns chart with benchmark',
+      'Fund tab: Risk metrics (Std Dev, Sharpe, Sortino, Beta, Max Drawdown)',
+      'Fund tab: NAV chart + drawdown chart',
+    ]
+  },
+  {
+    version: 'v1.0', date: 'Early 2026',
+    changes: [
+      'Initial build — single HTML file MF research platform',
+      'Firebase Firestore watchlist sync',
+      'Cloudflare Worker proxy for MFApi.in NAV data',
+      'IBM Plex Mono + dark theme UI',
+      'Fund search with auto-complete',
+    ]
+  },
+];
+
+window.openChangelog = function() {
+  const existing = document.getElementById('changelog-modal');
+  if (existing) { existing.remove(); return; }
+
+  const modal = document.createElement('div');
+  modal.id = 'changelog-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;';
+
+  const entries = CHANGELOG.map(v => `
+    <div style="margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent);">${v.version}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3);">${v.date}</span>
+        ${v.label ? `<span style="font-family:var(--mono);font-size:9px;background:var(--accent);color:#000;padding:1px 7px;border-radius:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">${v.label}</span>` : ''}
+      </div>
+      <ul style="list-style:none;padding:0;margin:0;">
+        ${v.changes.map(c => `
+          <li style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;font-family:var(--mono);color:var(--text2);line-height:1.5;">
+            <span style="color:var(--accent);flex-shrink:0;">+</span>
+            <span>${c}</span>
+          </li>`).join('')}
+      </ul>
+    </div>`).join('');
+
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;width:580px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
+      <div style="padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text);letter-spacing:1px;">CHANGELOG</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px;">MF Research Tool · VED Investment</div>
+        </div>
+        <button onclick="document.getElementById('changelog-modal').remove()" style="background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--text3);font-size:16px;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;line-height:1;">×</button>
+      </div>
+      <div style="padding:20px 22px;overflow-y:auto;flex:1;">
+        ${entries}
+      </div>
+      <div style="padding:12px 22px;border-top:1px solid var(--border);font-family:var(--mono);font-size:9px;color:var(--text3);flex-shrink:0;">
+        Built by VED Investment · ARN-253228 · Nadiad, Gujarat
+      </div>
+    </div>`;
+
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
 };
 </script>
 </body>
