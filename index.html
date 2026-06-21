@@ -35,6 +35,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root {
     --bg:        #080b12;
@@ -7263,19 +7264,40 @@ window.runCSR = async function() {
   </tr>` : '';
 
   resultEl.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
       <div style="font-family:var(--mono);font-size:11px;color:var(--text3);">
         <span style="color:var(--accent);font-weight:700;">${catLabel}</span>
         · ${planLabel} · ${years}Y SIP · ₹${(amt/1000).toFixed(0)}K/mo
         · <span style="color:var(--positive);">${results.length} funds</span>
         ${hasBench ? `· vs <span style="color:var(--accent);">${_csrBenchName}</span>` : ''}
       </div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--text3);">
-        ${startDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} → ${endDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--text3);">
+          ${startDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} → ${endDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}
+        </div>
+        <button onclick="window.csrExportPNG()" title="Download PNG"
+          style="background:transparent;border:1px solid var(--border2);border-radius:6px;padding:5px 10px;cursor:pointer;color:var(--text3);font-family:var(--mono);font-size:10px;display:flex;align-items:center;gap:5px;transition:all 0.15s;"
+          onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+          onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text3)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          PNG
+        </button>
+        <button onclick="window.csrExportPDF()" title="Download PDF"
+          style="background:transparent;border:1px solid var(--border2);border-radius:6px;padding:5px 10px;cursor:pointer;color:var(--text3);font-family:var(--mono);font-size:10px;display:flex;align-items:center;gap:5px;transition:all 0.15s;"
+          onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+          onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text3)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          PDF
+        </button>
       </div>
     </div>
-    <div style="overflow-x:auto;border:1px solid var(--border2);border-radius:var(--radius-lg);">
-      <table style="width:100%;border-collapse:collapse;min-width:480px;">
+    <div id="csr-snapshot-wrap" style="overflow-x:auto;border:1px solid var(--border2);border-radius:var(--radius-lg);">
+      <div id="csr-snapshot-inner" style="background:var(--surface);">
+        <div id="csr-snapshot-header" style="padding:12px 16px;border-bottom:1px solid var(--border);display:none;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#e8aa2e;">VED INVESTMENT · MF RESEARCH</div>
+          <div id="csr-snapshot-meta" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888;margin-top:3px;"></div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;min-width:480px;">
         <thead><tr>
           <th style="${hdrSt}text-align:center;">#</th>
           <th style="${hdrStL}">Fund</th>
@@ -7291,10 +7313,15 @@ window.runCSR = async function() {
           ${benchRow}
         </tbody>
       </table>
-    </div>
+      </div><!-- end csr-snapshot-inner -->
+    </div><!-- end csr-snapshot-wrap -->
     <div style="margin-top:8px;font-size:9px;font-family:var(--mono);color:var(--text3);">
       * XIRR via Newton-Raphson · Monthly SIP on 1st of month · Click any row to open fund · Alpha = Fund XIRR − Benchmark XIRR
     </div>`;
+
+  // Store snapshot metadata for export
+  window._csrSnapshotMeta = `${catLabel} · ${planLabel} · ${years}Y SIP · ₹${(amt/1000).toFixed(0)}K/mo${hasBench ? ' · vs ' + _csrBenchName : ''} · ${startDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} → ${endDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`;
+  window._csrSnapshotFile = `${catLabel.replace(/\s+/g,'-')}_${years}Y_SIP_${new Date().toISOString().split('T')[0]}`;
 
   statusEl.textContent = `✓ ${results.length} funds ranked`;
 };
@@ -7302,6 +7329,79 @@ window.runCSR = async function() {
 window.csrOpenFund = function(code) {
   const match = allFunds.find(f => String(f.schemeCode) === String(code));
   if (match) { selectedFund = match; loadFund(match); switchPage('fund'); }
+};
+
+window.csrExportPNG = async function() {
+  const wrap = document.getElementById('csr-snapshot-inner');
+  const hdr  = document.getElementById('csr-snapshot-header');
+  const meta = document.getElementById('csr-snapshot-meta');
+  if (!wrap) { showToast('No results to export', 'error'); return; }
+  // Show header for export
+  meta.textContent = window._csrSnapshotMeta || '';
+  hdr.style.display = 'block';
+  showToast('Capturing…', '');
+  try {
+    const canvas = await html2canvas(wrap, {
+      backgroundColor: '#0d1117',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+    const link = document.createElement('a');
+    link.download = (window._csrSnapshotFile || 'CSR-Snapshot') + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('PNG downloaded', 'success');
+  } catch(e) {
+    showToast('Export failed', 'error');
+  } finally {
+    hdr.style.display = 'none';
+  }
+};
+
+window.csrExportPDF = function() {
+  const inner = document.getElementById('csr-snapshot-inner');
+  if (!inner) { showToast('No results to export', 'error'); return; }
+  const meta  = window._csrSnapshotMeta || '';
+  const file  = window._csrSnapshotFile || 'CSR-Snapshot';
+  // Build a clean print window
+  const tableHTML = inner.querySelector('table')?.outerHTML || '';
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>${file}</title>
+    <style>
+      * { margin:0; padding:0; box-sizing:border-box; }
+      body { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #1a1a1a; background: #fff; padding: 24px 28px; }
+      @media print { body { padding: 10px; } @page { margin: 12mm; size: A4 landscape; } .no-print { display:none !important; } }
+      .hdr { border-bottom: 3px solid #1a1a1a; padding-bottom: 12px; margin-bottom: 16px; display:flex; justify-content:space-between; align-items:flex-end; }
+      .hdr-title { font-size: 16px; font-weight: 700; color: #1a1a1a; }
+      .hdr-meta { font-size: 10px; color: #555; margin-top: 4px; }
+      .hdr-right { font-size: 10px; color: #555; text-align:right; }
+      table { width:100%; border-collapse:collapse; font-size:10px; }
+      th { background:#f3f4f6; padding:6px 8px; text-align:right; font-size:8px; text-transform:uppercase; letter-spacing:1px; color:#555; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+      th:nth-child(2) { text-align:left; }
+      td { padding:5px 8px; border-bottom:1px solid #f3f4f6; text-align:right; white-space:nowrap; }
+      td:nth-child(2) { text-align:left; }
+      tr:last-child td { border-bottom:none; }
+      .footer { margin-top:12px; font-size:9px; color:#888; }
+      .print-btn { margin-bottom:16px; }
+      button { background:#1a1a1a; color:#fff; border:none; padding:7px 18px; border-radius:4px; cursor:pointer; font-size:12px; }
+    </style>
+  </head><body>
+    <div class="no-print print-btn"><button onclick="window.print()">🖨 Print / Save as PDF</button></div>
+    <div class="hdr">
+      <div>
+        <div class="hdr-title">Category SIP Ranker</div>
+        <div class="hdr-meta">${meta}</div>
+      </div>
+      <div class="hdr-right">VED Investment · ARN-253228<br>${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
+    </div>
+    ${tableHTML}
+    <div class="footer">* XIRR via Newton-Raphson · Monthly SIP on 1st of month · Alpha = Fund XIRR − Benchmark XIRR · Mutual fund investments are subject to market risks, read all scheme related documents carefully.</div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 600);
 };
 
 // ══════════════════════════════════════════════════════
