@@ -2502,9 +2502,6 @@ function buildSIPCashflows(navArr, startDate, endDate, amt, frequency = 'monthly
   const cashflows = [];
   let d = new Date(startDate);
 
-  // Normalise start to 1st of month for monthly/quarterly/halfyearly
-  if (['monthly','quarterly','halfyearly'].includes(frequency)) d.setDate(1);
-
   const advance = (date) => {
     const n = new Date(date);
     switch(frequency) {
@@ -2519,7 +2516,12 @@ function buildSIPCashflows(navArr, startDate, endDate, amt, frequency = 'monthly
   };
 
   while (d <= endDate) {
-    const nav = closestNav(navArr, new Date(d));
+    // Use next available NAV on or after date (handles weekends/holidays correctly)
+    const tMs = d.getTime();
+    let nav = null;
+    for (let i = 0; i < navArr.length; i++) {
+      if (navArr[i].date.getTime() >= tMs) { nav = navArr[i]; break; }
+    }
     if (nav) cashflows.push({ date: new Date(d), amount: -amt, nav: nav.nav });
     d = advance(d);
   }
@@ -7409,7 +7411,17 @@ window.csrExportPDF = function() {
 // ══════════════════════════════════════════════════════
 const CHANGELOG = [
   {
-    version: 'v1.9', date: 'Jun 2026', label: 'latest',
+    version: 'v2.0', date: 'Jun 2026', label: 'latest',
+    changes: [
+      'Category SIP Ranker: PNG + PDF export buttons on results',
+      'Category SIP Ranker: ETF, Index, close-ended series, IDCW, dividend, payout, bonus option funds excluded',
+      'Category SIP Ranker: JM Midcap and other midcap/largecap spelling variants now correctly matched',
+      'Changelog modal added — bottom of sidebar, full version history',
+      'Sidebar search: clicking result now loads fund immediately (was only adding to watchlist)',
+    ]
+  },
+  {
+    version: 'v1.9', date: 'Jun 2026',
     changes: [
       'Category SIP Ranker added inside SIP Calc tab — rank all funds in a category by XIRR with Alpha vs benchmark',
       'Nifty 500 Multicap (152778) added as 7th benchmark pill across all tabs',
