@@ -2484,15 +2484,18 @@ function calcSIPYearly(navArr) {
   const results = [];
 
   for (let y = 1; y <= Math.max(years, 1); y++) {
+    // Change 2: anchor to last available NAV date (not Date.now())
+    // Change 1: start = (N×12 − 1) months before anchor → last SIP = current month, total = N×12 SIPs
     const startDate = new Date(latest.date);
-    startDate.setFullYear(startDate.getFullYear() - y);
+    startDate.setMonth(startDate.getMonth() - (y * 12 - 1));
     if (startDate < inceptionDate) break;
     const cashflows = buildSIPCashflows(navArr, startDate, latest.date, 10000);
     if (cashflows.length < 3) continue;
     const xirr = calcXIRR(cashflows);
     const invested = cashflows.filter(c => c.amount < 0).length * 10000;
-    const worth = cashflows[cashflows.length - 1].amount; // actual redemption value
-    results.push({ years: y, xirr, invested, worth });
+    const worth = cashflows[cashflows.length - 1].amount;
+    const lastNav = latest.nav;
+    results.push({ years: y, xirr, invested, worth, cashflows, lastNav });
   }
 
   return results;
@@ -2559,23 +2562,33 @@ function renderSIPSection(sipData) {
     const alphaCol = alpha === null ? 'var(--text3)' : alpha > 0 ? 'var(--positive)' : 'var(--negative)';
 
     const gain = worth - s.invested;
-    const gainPct = s.invested > 0 ? (gain / s.invested) * 100 : 0;
     const gainCol = gain >= 0 ? 'var(--positive)' : 'var(--negative)';
     const gridCols = hasBench
       ? '36px 72px 86px 90px 86px 52px 62px 64px'
       : '36px 72px 86px 90px 86px 52px';
+
+    // Store cashflows on window for transaction table access
+    window._sipCashflows = window._sipCashflows || {};
+    if (s.cashflows) window._sipCashflows[s.years] = { cashflows: s.cashflows, lastNav: s.lastNav };
+
     return `
-    <div style="display:grid;grid-template-columns:${gridCols};align-items:center;padding:5px 14px;border-bottom:1px solid var(--border);min-width:max-content;">
-      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);">${s.years}Y</div>
-      <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:${xirrCol};text-align:right;padding-right:8px;">${xirr.toFixed(2)}%</div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:right;padding-right:8px;">₹${fmtAmt(s.invested)}</div>
-      <div style="font-family:var(--mono);font-size:11px;font-weight:600;color:${worth>s.invested?'var(--positive)':'var(--negative)'};text-align:right;padding-right:8px;">₹${fmtAmt(worth)}</div>
-      <div style="font-family:var(--mono);font-size:11px;font-weight:600;color:${gainCol};text-align:right;padding-right:8px;">${gain>=0?'+':''}₹${fmtAmt(Math.abs(gain))}</div>
-      <div style="font-family:var(--mono);font-size:10px;color:${multip>=1?'var(--positive)':'var(--negative)'};text-align:right;">${multip.toFixed(2)}x</div>
-      ${hasBench ? `
-      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-align:right;padding-right:6px;">${bXIRR !== null ? bXIRR.toFixed(1)+'%' : '—'}</div>
-      <div style="font-family:var(--mono);font-size:10px;font-weight:700;color:${alphaCol};text-align:right;">${alpha !== null ? (alpha>0?'+':'')+alpha.toFixed(1)+'%' : '—'}</div>
-      ` : ''}
+    <div>
+      <div onclick="window._toggleSIPTxn(${s.years})" style="display:grid;grid-template-columns:${gridCols};align-items:center;padding:5px 14px;border-bottom:1px solid var(--border);min-width:max-content;cursor:pointer;transition:background 0.12s;"
+        onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px;">
+          <span id="sip-arrow-${s.years}" style="font-size:8px;transition:transform 0.2s;">▶</span>${s.years}Y
+        </div>
+        <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:${xirrCol};text-align:right;padding-right:8px;">${xirr.toFixed(2)}%</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:right;padding-right:8px;">₹${fmtAmt(s.invested)}</div>
+        <div style="font-family:var(--mono);font-size:11px;font-weight:600;color:${worth>s.invested?'var(--positive)':'var(--negative)'};text-align:right;padding-right:8px;">₹${fmtAmt(worth)}</div>
+        <div style="font-family:var(--mono);font-size:11px;font-weight:600;color:${gainCol};text-align:right;padding-right:8px;">${gain>=0?'+':''}₹${fmtAmt(Math.abs(gain))}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:${multip>=1?'var(--positive)':'var(--negative)'};text-align:right;">${multip.toFixed(2)}x</div>
+        ${hasBench ? `
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-align:right;padding-right:6px;">${bXIRR !== null ? bXIRR.toFixed(1)+'%' : '—'}</div>
+        <div style="font-family:var(--mono);font-size:10px;font-weight:700;color:${alphaCol};text-align:right;">${alpha !== null ? (alpha>0?'+':'')+alpha.toFixed(1)+'%' : '—'}</div>
+        ` : ''}
+      </div>
+      <div id="sip-txn-${s.years}" style="display:none;"></div>
     </div>`;
   }).join('');
 
@@ -3505,7 +3518,7 @@ window.calcSIP = async function() {
         const finalVal = cf[cf.length-1].amount;
         const gain = finalVal - invested;
         const alpha = bench ? xirr - bench.xirr : null;
-        results.push({name:slot.name,code:slot.code,xirr,invested,finalVal,gain,alpha,installments:cf.length-1,ok:true});
+        results.push({name:slot.name,code:slot.code,xirr,invested,finalVal,gain,alpha,installments:cf.length-1,cf,ok:true});
       } catch(e) { results.push({name:slot.name,code:slot.code,ok:false,error:e.message}); }
     }
     results.sort((a,b)=>(b.xirr||0)-(a.xirr||0));
@@ -3519,16 +3532,21 @@ window.calcSIP = async function() {
       {label:'Best XIRR 🥇', value:`${bestXirr.toFixed(2)}%`, sub:okR.find(r=>r.xirr===bestXirr)?.name?.substring(0,35)||'', color:'var(--positive)'},
       {label:'Worst XIRR', value:`${worstXirr.toFixed(2)}%`, sub:okR.find(r=>r.xirr===worstXirr)?.name?.substring(0,35)||'', color: worstXirr<0?'var(--danger)':'var(--warn)'},
     ]);
+    window._sipCalcCF = {};
     const tableRows = results.map((r,i)=>{
       if (!r.ok) return `<tr><td colspan="7" style="color:var(--danger);font-size:11px;">${r.name} — ${r.error}</td></tr>`;
+      if (r.cf) window._sipCalcCF[r.code] = r.cf;
       const isBest  = okR.length>1 && r.xirr===bestXirr;
       const isWorst = okR.length>1 && r.xirr===worstXirr;
       const xirrCol = r.xirr>15?'var(--positive)':r.xirr>8?'var(--accent)':r.xirr>0?'var(--saffron)':'var(--negative)';
       const barW    = bestXirr>0 ? Math.max(0,(r.xirr/bestXirr)*100) : 0;
       const fmtV    = v => { const a=Math.abs(v); return a>=10000000?`₹${(v/10000000).toFixed(2)}Cr`:a>=100000?`₹${(v/100000).toFixed(2)}L`:`₹${(v/1000).toFixed(1)}K`; };
-      return `<tr style="${isBest?'background:rgba(45,212,160,0.04)':isWorst?'background:rgba(240,92,120,0.04)':''}">
-        <td style="text-align:left;white-space:normal;max-width:240px;">
-          <div style="font-size:12px;color:var(--text);margin-bottom:2px;">${isBest?'🥇 ':isWorst?'🔴 ':''}${r.name.substring(0,52)}${r.name.length>52?'…':''}</div>
+      return `<tr style="${isBest?'background:rgba(45,212,160,0.04)':isWorst?'background:rgba(240,92,120,0.04)':''}" onclick="window._toggleSIPCalcTxn('${r.code}')" style="cursor:pointer;">
+        <td style="text-align:left;white-space:normal;max-width:240px;cursor:pointer;">
+          <div style="font-size:12px;color:var(--text);margin-bottom:2px;display:flex;align-items:center;gap:6px;">
+            <span id="sipcalc-arrow-${r.code}" style="font-size:8px;color:var(--text3);transition:transform 0.2s;flex-shrink:0;">▶</span>
+            ${isBest?'🥇 ':isWorst?'🔴 ':''}${r.name.substring(0,52)}${r.name.length>52?'…':''}
+          </div>
           <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:5px;">${r.code} · ${r.installments} instalments · ${freqLabel}</div>
           <div style="height:2px;background:var(--surface3);border-radius:2px;overflow:hidden;max-width:180px;">
             <div style="width:${barW}%;height:100%;background:${xirrCol};border-radius:2px;"></div>
@@ -3540,7 +3558,8 @@ window.calcSIP = async function() {
         <td style="font-family:var(--mono);font-size:11px;color:${r.gain>0?'var(--positive)':'var(--negative)'};">${r.gain>0?'+':''}${fmtV(r.gain)}</td>
         <td style="font-family:var(--mono);font-size:11px;color:${r.gain>0?'var(--positive)':'var(--negative)'};">${((r.gain/r.invested)*100).toFixed(1)}%</td>
         ${bench?`<td style="font-family:var(--mono);font-size:12px;font-weight:600;color:${r.alpha>0?'var(--positive)':'var(--negative)'};">${r.alpha>0?'+':''}${r.alpha.toFixed(2)}%</td>`:''}
-      </tr>`;
+      </tr>
+      <tr id="sipcalc-txn-${r.code}" style="display:none;"><td colspan="${bench?7:6}" style="padding:0;"></td></tr>`;
     }).join('');
     const cols = [{label:'Fund',left:true,nosort:true},{label:'XIRR'},{label:'Invested'},{label:'Final Value'},{label:'Gain/Loss'},{label:'Abs Return'},...(bench?[{label:'Alpha'}]:[])];
     resultEl.innerHTML = summary + resultsTable(cols, tableRows, `* ${freqLabel} SIP · XIRR via Newton-Raphson`);
@@ -7124,16 +7143,26 @@ window.runCSR = async function() {
     return;
   }
 
-  // 3. Date range — end = today, start = exactly N years ago
-  const endDate   = new Date();
-  const startDate = new Date(endDate);
-  startDate.setFullYear(startDate.getFullYear() - years);
-
-  // Override with custom dates if provided
+  // 3. Date range
+  // Change 2: derive effective "today" from benchmark or first fund's last NAV — handled per-fund below
+  // For the period window anchor we use actual today but will override per-fund if custom dates not set
   const customStart = document.getElementById('csr-start')?.value;
   const customEnd   = document.getElementById('csr-end')?.value;
+
+  // If custom dates provided, use them directly
+  // Otherwise: endDate = last available NAV (derived per fund), startDate = N×12−1 months before that
+  // For benchmark we need dates upfront — use today as proxy, per-fund will self-anchor
+  const today = new Date();
+  let endDate   = new Date(today);
+  let startDate = new Date(today);
+
   if (customStart) { const d = new Date(customStart); if (!isNaN(d)) startDate.setTime(d.getTime()); }
   if (customEnd)   { const d = new Date(customEnd);   if (!isNaN(d)) endDate.setTime(d.getTime()); }
+
+  // If no custom dates, apply Change 1: start = N×12−1 months before today
+  if (!customStart && !customEnd) {
+    startDate.setMonth(startDate.getMonth() - (years * 12 - 1));
+  }
 
   // 4. Load benchmark NAV if selected
   let benchNavArr = null;
@@ -7164,11 +7193,17 @@ window.runCSR = async function() {
       try {
         const nd     = await getNav(f.schemeCode);
         const navArr = nd.data.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) })).filter(n => !isNaN(n.nav)).reverse();
-        if (!navArr.length || navArr[0].date > startDate) { done++; return; }
+        if (!navArr.length) { done++; return; }
 
-        // buildSIPCashflows already appends redemption at last NAV date
-        const cfs = buildSIPCashflows(navArr, startDate, endDate, amt, 'monthly');
-        if (cfs.length < 3) { done++; return; } // need at least 2 instalments + redemption
+        // Change 2: anchor end to fund's last available NAV date (not today)
+        // Change 1: start = N×12−1 months before anchor
+        const fEnd   = customEnd   ? endDate   : navArr[navArr.length - 1].date;
+        const fStart = customStart ? new Date(startDate) : (() => { const d = new Date(fEnd); d.setMonth(d.getMonth() - (years * 12 - 1)); return d; })();
+
+        if (fStart < navArr[0].date) { done++; return; }
+
+        const cfs = buildSIPCashflows(navArr, fStart, fEnd, amt, 'monthly');
+        if (cfs.length < 3) { done++; return; }
 
         const xirr = calcXIRR(cfs); // use cfs directly — already has redemption
         if (isNaN(xirr) || !isFinite(xirr)) { done++; return; }
@@ -7180,7 +7215,7 @@ window.runCSR = async function() {
         const alpha    = (benchXIRR !== null && !isNaN(benchXIRR)) ? (xirr - benchXIRR) : null;
         const instals  = cfs.length - 1; // exclude redemption cashflow
 
-        results.push({ name: f.schemeName, code: f.schemeCode, xirr, invested, worth, gain, alpha, cfs: instals });
+        results.push({ name: f.schemeName, code: f.schemeCode, xirr, invested, worth, gain, alpha, cfs: instals, fStart, fEnd });
       } catch(e) {}
       done++;
       statusEl.textContent = `${done} / ${total} funds loaded…`;
@@ -7194,6 +7229,10 @@ window.runCSR = async function() {
   }
 
   results.sort((a, b) => b.xirr - a.xirr);
+
+  // Derive actual date range from results for display (Change 2 anchor)
+  const displayEnd   = customEnd   ? endDate   : (results[0]?.fEnd   || endDate);
+  const displayStart = customStart ? startDate : (results[0]?.fStart || startDate);
 
   const fmtA      = v => v >= 10000000 ? (v/10000000).toFixed(2)+' Cr' : v >= 100000 ? (v/100000).toFixed(2)+' L' : (v/1000).toFixed(1)+' K';
   const planLabel = plan === 'direct_growth' ? 'Direct Growth' : 'Regular Growth';
@@ -7275,7 +7314,7 @@ window.runCSR = async function() {
       </div>
       <div style="display:flex;align-items:center;gap:12px;">
         <div style="font-size:10px;font-family:var(--mono);color:var(--text3);">
-          ${startDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} → ${endDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}
+          ${displayStart.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} → ${displayEnd.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}
         </div>
         <button onclick="window.csrExportPNG()" title="Download PNG"
           style="background:transparent;border:1px solid var(--border2);border-radius:6px;padding:5px 10px;cursor:pointer;color:var(--text3);font-family:var(--mono);font-size:10px;display:flex;align-items:center;gap:5px;transition:all 0.15s;"
@@ -7322,10 +7361,191 @@ window.runCSR = async function() {
     </div>`;
 
   // Store snapshot metadata for export
-  window._csrSnapshotMeta = `${catLabel} · ${planLabel} · ${years}Y SIP · ₹${(amt/1000).toFixed(0)}K/mo${hasBench ? ' · vs ' + _csrBenchName : ''} · ${startDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} → ${endDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`;
+  window._csrSnapshotMeta = `${catLabel} · ${planLabel} · ${years}Y SIP · ₹${(amt/1000).toFixed(0)}K/mo${hasBench ? ' · vs ' + _csrBenchName : ''} · ${displayStart.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} → ${displayEnd.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`;
   window._csrSnapshotFile = `${catLabel.replace(/\s+/g,'-')}_${years}Y_SIP_${new Date().toISOString().split('T')[0]}`;
 
   statusEl.textContent = `✓ ${results.length} funds ranked`;
+};
+
+
+
+window._toggleSIPCalcTxn = function(code) {
+  const row   = document.getElementById(`sipcalc-txn-${code}`);
+  const arrow = document.getElementById(`sipcalc-arrow-${code}`);
+  if (!row) return;
+  const td = row.querySelector('td');
+
+  if (row.style.display !== 'none') {
+    row.style.display = 'none';
+    if (arrow) arrow.style.transform = 'rotate(0deg)';
+    return;
+  }
+  if (td && td.innerHTML.trim()) {
+    row.style.display = '';
+    if (arrow) arrow.style.transform = 'rotate(90deg)';
+    return;
+  }
+
+  const cfs = (window._sipCalcCF || {})[code];
+  if (!cfs || cfs.length < 2) {
+    if (td) td.innerHTML = '<div style="padding:10px 14px;font-family:var(--mono);font-size:10px;color:var(--text3);">No transaction data.</div>';
+    row.style.display = ''; if (arrow) arrow.style.transform = 'rotate(90deg)'; return;
+  }
+
+  const instalments = cfs.filter(c => c.amount < 0);
+  const redemption  = cfs[cfs.length - 1];
+  const totalUnits  = instalments.reduce((s, c) => s + Math.abs(c.amount) / c.nav, 0);
+  const currentNav  = redemption.amount / totalUnits;
+
+  const fmt  = v => v >= 10000000 ? "₹"+(v/10000000).toFixed(2)+"Cr" : v >= 100000 ? "₹"+(v/100000).toFixed(2)+"L" : "₹"+(v/1000).toFixed(2)+"K";
+  const fmtN = v => v.toFixed(4);
+  const fmtD = d => d instanceof Date ? d.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "—";
+
+  const thSt  = "font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;padding:6px 10px;text-align:right;border-bottom:2px solid var(--border2);background:var(--surface2);white-space:nowrap;";
+  const thStL = thSt.replace("text-align:right","text-align:left");
+  const tdSt  = "font-family:var(--mono);font-size:10px;padding:5px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;";
+  const tdStL = tdSt.replace("text-align:right","text-align:left");
+
+  let cumUnits = 0;
+  const txnRows = instalments.map((c, i) => {
+    const units  = Math.abs(c.amount) / c.nav;
+    cumUnits    += units;
+    const absRet = ((currentNav - c.nav) / c.nav) * 100;
+    const retCol = absRet >= 0 ? "var(--positive)" : "var(--negative)";
+    return `<tr onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'transparent\'">
+      <td style="${tdSt}text-align:center;color:var(--text3);">${i+1}</td>
+      <td style="${tdStL}">${fmtD(c.date)}</td>
+      <td style="${tdSt}">₹${Math.abs(c.amount).toLocaleString("en-IN")}</td>
+      <td style="${tdSt}">${fmtN(c.nav)}</td>
+      <td style="${tdSt}color:var(--text2);">${fmtN(units)}</td>
+      <td style="${tdSt}color:var(--text2);">${fmtN(cumUnits)}</td>
+      <td style="${tdSt}font-weight:600;color:${retCol};">${absRet>=0?"+":""}${absRet.toFixed(2)}%</td>
+    </tr>`;
+  }).join("");
+
+  const totalInvested = instalments.length * Math.abs(instalments[0].amount);
+  const totalValue    = redemption.amount;
+  const totalGain     = totalValue - totalInvested;
+  const totalGainCol  = totalGain >= 0 ? "var(--positive)" : "var(--negative)";
+
+  if (td) td.innerHTML = `
+    <div style="background:var(--surface2);border-bottom:1px solid var(--border2);padding:8px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">
+        ${instalments.length} instalments · Current NAV <span style="color:var(--accent);">₹${currentNav.toFixed(4)}</span> · as of ${fmtD(redemption.date)}
+      </div>
+      <div style="display:flex;gap:16px;font-family:var(--mono);font-size:10px;">
+        <span>Invested <span style="color:var(--text);">${fmt(totalInvested)}</span></span>
+        <span>Value <span style="color:var(--positive);">${fmt(totalValue)}</span></span>
+        <span>Gain <span style="color:${totalGainCol};">${totalGain>=0?"+":""}${fmt(Math.abs(totalGain))}</span></span>
+      </div>
+    </div>
+    <div style="overflow-x:auto;max-height:320px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;min-width:520px;">
+        <thead><tr>
+          <th style="${thSt}text-align:center;">#</th>
+          <th style="${thStL}">SIP Date</th>
+          <th style="${thSt}">Amount</th>
+          <th style="${thSt}">NAV Paid</th>
+          <th style="${thSt}">Units</th>
+          <th style="${thSt}">Cum. Units</th>
+          <th style="${thSt}">Abs Return</th>
+        </tr></thead>
+        <tbody>${txnRows}</tbody>
+      </table>
+    </div>`;
+
+  row.style.display = "";
+  if (arrow) arrow.style.transform = "rotate(90deg)";
+};
+
+window._toggleSIPTxn = function(years) {
+  const el    = document.getElementById(`sip-txn-${years}`);
+  const arrow = document.getElementById(`sip-arrow-${years}`);
+  if (!el) return;
+
+  if (el.style.display !== 'none') {
+    el.style.display = 'none';
+    if (arrow) arrow.style.transform = 'rotate(0deg)';
+    return;
+  }
+
+  if (el.innerHTML) {
+    el.style.display = 'block';
+    if (arrow) arrow.style.transform = 'rotate(90deg)';
+    return;
+  }
+
+  const data = (window._sipCashflows || {})[years];
+  if (!data || !data.cashflows) {
+    el.innerHTML = '<div style="padding:10px 14px;font-family:var(--mono);font-size:10px;color:var(--text3);">No transaction data available.</div>';
+    el.style.display = 'block'; return;
+  }
+
+  const cfs         = data.cashflows;
+  const instalments = cfs.filter(c => c.amount < 0);
+  const redemption  = cfs[cfs.length - 1];
+  const totalUnits  = instalments.reduce((s, c) => s + Math.abs(c.amount) / c.nav, 0);
+  const currentNav  = redemption.amount / totalUnits;
+
+  const fmt  = v => v >= 10000000 ? "\u20B9"+(v/10000000).toFixed(2)+"Cr" : v >= 100000 ? "\u20B9"+(v/100000).toFixed(2)+"L" : "\u20B9"+(v/1000).toFixed(2)+"K";
+  const fmtN = v => v.toFixed(4);
+  const fmtD = d => d instanceof Date ? d.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "\u2014";
+
+  const thSt  = "font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;padding:6px 10px;text-align:right;border-bottom:2px solid var(--border2);background:var(--surface2);white-space:nowrap;";
+  const thStL = thSt.replace("text-align:right","text-align:left");
+  const tdSt  = "font-family:var(--mono);font-size:10px;padding:5px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;";
+  const tdStL = tdSt.replace("text-align:right","text-align:left");
+
+  let cumUnits = 0;
+  const txnRows = instalments.map((c, i) => {
+    const units  = Math.abs(c.amount) / c.nav;
+    cumUnits    += units;
+    const absRet = ((currentNav - c.nav) / c.nav) * 100;
+    const retCol = absRet >= 0 ? "var(--positive)" : "var(--negative)";
+    return `<tr onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+      <td style="${tdSt}text-align:center;color:var(--text3);">${i+1}</td>
+      <td style="${tdStL}">${fmtD(c.date)}</td>
+      <td style="${tdSt}">₹${Math.abs(c.amount).toLocaleString("en-IN")}</td>
+      <td style="${tdSt}">${fmtN(c.nav)}</td>
+      <td style="${tdSt}color:var(--text2);">${fmtN(units)}</td>
+      <td style="${tdSt}color:var(--text2);">${fmtN(cumUnits)}</td>
+      <td style="${tdSt}font-weight:600;color:${retCol};">${absRet>=0?"+":""}${absRet.toFixed(2)}%</td>
+    </tr>`;
+  }).join("");
+
+  const totalInvested = instalments.length * Math.abs(instalments[0].amount);
+  const totalValue    = redemption.amount;
+  const totalGain     = totalValue - totalInvested;
+  const totalGainCol  = totalGain >= 0 ? "var(--positive)" : "var(--negative)";
+
+  el.innerHTML = `
+    <div style="background:var(--surface2);border-bottom:1px solid var(--border2);padding:8px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">
+        ${instalments.length} instalments · Current NAV <span style="color:var(--accent);">₹${currentNav.toFixed(4)}</span> · as of ${fmtD(redemption.date)}
+      </div>
+      <div style="display:flex;gap:16px;font-family:var(--mono);font-size:10px;">
+        <span>Invested <span style="color:var(--text);">${fmt(totalInvested)}</span></span>
+        <span>Value <span style="color:var(--positive);">${fmt(totalValue)}</span></span>
+        <span>Gain <span style="color:${totalGainCol};">${totalGain>=0?"+":""}${fmt(Math.abs(totalGain))}</span></span>
+      </div>
+    </div>
+    <div style="overflow-x:auto;max-height:320px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;min-width:520px;">
+        <thead><tr>
+          <th style="${thSt}text-align:center;">#</th>
+          <th style="${thStL}">SIP Date</th>
+          <th style="${thSt}">Amount</th>
+          <th style="${thSt}">NAV Paid</th>
+          <th style="${thSt}">Units</th>
+          <th style="${thSt}">Cum. Units</th>
+          <th style="${thSt}">Abs Return</th>
+        </tr></thead>
+        <tbody>${txnRows}</tbody>
+      </table>
+    </div>`;
+
+  el.style.display = "block";
+  if (arrow) arrow.style.transform = "rotate(90deg)";
 };
 
 window.csrOpenFund = function(code) {
@@ -7338,9 +7558,27 @@ window.csrExportPNG = async function() {
   const hdr  = document.getElementById('csr-snapshot-header');
   const meta = document.getElementById('csr-snapshot-meta');
   if (!wrap) { showToast('No results to export', 'error'); return; }
+
   // Show header for export
   meta.textContent = window._csrSnapshotMeta || '';
   hdr.style.display = 'block';
+
+  // Add branded footer temporarily
+  const footer = document.createElement('div');
+  footer.id = 'csr-png-footer';
+  footer.style.cssText = 'padding:10px 16px;border-top:1px solid #2a2f3a;display:flex;justify-content:space-between;align-items:center;';
+  footer.innerHTML = `
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#e8aa2e;font-weight:700;">VED Investment · Vivek Vijaykumar Chawla · ARN-253228</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#555;">${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>`;
+  wrap.appendChild(footer);
+
+  // Add disclaimer strip
+  const disc = document.createElement('div');
+  disc.id = 'csr-png-disc';
+  disc.style.cssText = 'padding:7px 16px;background:#0a0d14;border-top:1px solid #2a2f3a;';
+  disc.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888;text-align:center;line-height:1.6;">Mutual fund investments are subject to market risks, read all scheme related documents carefully. Past performance is not indicative of future returns. This category / mutual fund scheme may or may not be suitable as per your risk appetite.</div>`;
+  wrap.appendChild(disc);
+
   showToast('Capturing…', '');
   try {
     const canvas = await html2canvas(wrap, {
@@ -7358,6 +7596,8 @@ window.csrExportPNG = async function() {
     showToast('Export failed', 'error');
   } finally {
     hdr.style.display = 'none';
+    document.getElementById('csr-png-footer')?.remove();
+    document.getElementById('csr-png-disc')?.remove();
   }
 };
 
@@ -7386,7 +7626,7 @@ window.csrExportPDF = function() {
       td { padding:5px 8px; border-bottom:1px solid #f3f4f6; text-align:right; white-space:nowrap; }
       td:nth-child(2) { text-align:left; }
       tr:last-child td { border-bottom:none; }
-      .footer { margin-top:12px; font-size:9px; color:#888; }
+      .footer { margin-top:16px; font-size:11px; color:#444; line-height:1.7; border-top:1px solid #e5e7eb; padding-top:12px; }
       .print-btn { margin-bottom:16px; }
       button { background:#1a1a1a; color:#fff; border:none; padding:7px 18px; border-radius:4px; cursor:pointer; font-size:12px; }
     </style>
@@ -7397,10 +7637,10 @@ window.csrExportPDF = function() {
         <div class="hdr-title">Category SIP Ranker</div>
         <div class="hdr-meta">${meta}</div>
       </div>
-      <div class="hdr-right">VED Investment · ARN-253228<br>${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
+      <div class="hdr-right">VED Investment · ARN-253228<br>Vivek Vijaykumar Chawla<br>${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
     </div>
     ${tableHTML}
-    <div class="footer">* XIRR via Newton-Raphson · Monthly SIP on 1st of month · Alpha = Fund XIRR − Benchmark XIRR · Mutual fund investments are subject to market risks, read all scheme related documents carefully.</div>
+    <div class="footer">* XIRR via Newton-Raphson · Monthly SIP on 1st of month · Alpha = Fund XIRR − Benchmark XIRR<br><br>Mutual fund investments are subject to market risks, read all scheme related documents carefully. Past performance is not indicative of future returns. This category / mutual fund scheme may or may not be suitable as per your risk appetite.</div>
   </body></html>`);
   win.document.close();
   setTimeout(() => win.print(), 600);
