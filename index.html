@@ -1157,6 +1157,7 @@
                   <option value="balanced">Balanced Advantage / BAF</option>
                   <option value="multi asset">Multi Asset Allocation</option>
                   <option value="arbitrage">Arbitrage</option>
+                  <option value="income plus arbitrage">Income Plus Arbitrage</option>
                   <option value="equity savings">Equity Savings</option>
                 </optgroup>
                 <optgroup label="Index / ETF">
@@ -7103,6 +7104,8 @@ window.runCSR = async function() {
     'flexi cap':     ['multi cap'],
     'value fund':    ['contra'],
     'contra':        ['value fund'],
+    'arbitrage':     ['income plus', 'income & arb', 'income and arb', 'plus arbitrage', 'income plus arbitrage'],
+    'income plus arbitrage': [],
     'sectoral':      [],
     'thematic':      [],
   };
@@ -7115,20 +7118,26 @@ window.runCSR = async function() {
     'flexi cap':  ['flexi cap', 'flexicap'],
     'large & mid':['large & mid', 'large and mid'],
     'multi cap':  ['multi cap', 'multicap'],
+    'income plus arbitrage': ['income plus arbitrage'],
   };
 
-  // Always exclude ETFs, Index funds, FoFs from active fund categories
-  const ALWAYS_EXCLUDE = ['etf', 'index', ' nifty ', ' sensex ', 'fund of fund', ' fof ', 'feeder', 'exchange traded', 'series 1', 'series 2', 'series 3', 'series 4', 'series 5', 'series 6', 'series 7', 'series 8', 'series 9', ' - sr ', 'close ended', 'closed ended', 'idcw', 'dividend', 'payout', 'bonus option', 'bonus plan'];
+  // Always exclude ETFs, Index funds, FoFs, IDCW/income distribution variants
+  const ALWAYS_EXCLUDE = ['etf', 'index', ' nifty ', ' sensex ', 'fund of fund', ' fof ', 'feeder', 'exchange traded', 'series 1', 'series 2', 'series 3', 'series 4', 'series 5', 'series 6', 'series 7', 'series 8', 'series 9', ' - sr ', 'close ended', 'closed ended', 'idcw', 'dividend', 'payout', 'bonus option', 'bonus plan', 'income distribution', 'weekly reinvestment', 'fortnightly', 'monthly reinvestment'];
 
   const excludeTerms = CAT_EXCLUDE[catKeyword] || [];
   const matchTerms   = CAT_ALIASES[catKeyword] || [catKeyword];
+
+  // For income plus arbitrage, FOF structures are the norm — don't exclude them
+  const alwaysExclude = catKeyword === 'income plus arbitrage'
+    ? ALWAYS_EXCLUDE.filter(e => e !== 'fund of fund' && e !== ' fof ' && e !== 'feeder')
+    : ALWAYS_EXCLUDE;
 
   let funds = allFunds
     .filter(f => {
       const n = f.schemeName.toLowerCase();
       if (!matchTerms.some(m => n.includes(m))) return false;
       for (const ex of excludeTerms) { if (n.includes(ex)) return false; }
-      for (const ex of ALWAYS_EXCLUDE) { if (n.includes(ex)) return false; }
+      for (const ex of alwaysExclude) { if (n.includes(ex)) return false; }
       return true;
     })
     .map(f => ({ ...f, planType: detectPlanType(f.schemeName) }))
