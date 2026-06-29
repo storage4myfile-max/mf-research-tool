@@ -691,6 +691,10 @@
   .btn-export.xl    { border-color:rgba(232,170,46,0.3); color:var(--accent); }
   .btn-export.csv:hover { background:rgba(45,212,160,0.07); }
   .btn-export.xl:hover  { background:rgba(232,170,46,0.07); }
+  .btn-export.png { border-color:rgba(100,160,255,0.3); color:#6ab0f5; }
+  .btn-export.pdf { border-color:rgba(240,92,120,0.3); color:var(--negative); }
+  .btn-export.png:hover { background:rgba(100,160,255,0.07); }
+  .btn-export.pdf:hover { background:rgba(240,92,120,0.07); }
 
   /* ── XIRR COLOURS ───────────────────────────── */
   .xirr-pos { color:var(--positive) !important; font-weight:600; }
@@ -3431,7 +3435,7 @@ function summaryBoxes(boxes) {
     </div>`).join('')}</div>`;
 }
 
-function resultsTable(cols, rows, note, tableId, title) {
+function resultsTable(cols, rows, note, tableId, title, extraButtons) {
   const tid = tableId || ('tbl_'+Math.random().toString(36).slice(2,7));
   const exportTitle = title || 'MF_Research_Export';
   const header = cols.map(c => {
@@ -3442,6 +3446,7 @@ function resultsTable(cols, rows, note, tableId, title) {
     <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
     <button class="btn-export btn-export-csv"  onclick="exportTableCSV('${tid}','${exportTitle}')">⬇ CSV</button>
     <button class="btn-export btn-export-xlsx" onclick="exportTableXLSX('${tid}','${exportTitle}')">⬇ Excel</button>
+    ${extraButtons || ''}
   </div>
   <div class="compare-table-wrap"><table class="compare-table" style="min-width:560px;" id="${tid}">
     <thead><tr>${header}</tr></thead>
@@ -3563,7 +3568,10 @@ window.calcSIP = async function() {
       <tr id="sipcalc-txn-${r.code}" style="display:none;"><td colspan="${bench?7:6}" style="padding:0;"></td></tr>`;
     }).join('');
     const cols = [{label:'Fund',left:true,nosort:true},{label:'XIRR'},{label:'Invested'},{label:'Final Value'},{label:'Gain/Loss'},{label:'Abs Return'},...(bench?[{label:'Alpha'}]:[])];
-    resultEl.innerHTML = summary + resultsTable(cols, tableRows, `* ${freqLabel} SIP · XIRR via Newton-Raphson`);
+    const sipExtraButtons = `<button class="btn-export png" onclick="window.sipCalcExportPNG()">⬇ PNG</button><button class="btn-export pdf" onclick="window.sipCalcExportPDF()">⬇ PDF</button>`;
+    window._sipCalcMeta = `${freqLabel} SIP · ₹${amt.toLocaleString('en-IN')}/instalment · ${startStr} → ${endStr}`;
+    window._sipCalcSnapshot = { results, bench, amt, freqLabel, startStr, endStr };
+    resultEl.innerHTML = `<div id="sipCalcPrintArea">` + summary + resultsTable(cols, tableRows, `* ${freqLabel} SIP · XIRR via Newton-Raphson`, undefined, 'SIP_Calc', sipExtraButtons) + `</div>`;
   } catch(e) { resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:12px;padding:12px;">${e.message}</div>`; }
 }
 
@@ -7650,6 +7658,141 @@ window.csrExportPDF = function() {
     </div>
     ${tableHTML}
     <div class="footer">* XIRR via Newton-Raphson · Monthly SIP on 1st of month · Alpha = Fund XIRR − Benchmark XIRR<br><br>Mutual fund investments are subject to market risks, read all scheme related documents carefully. Past performance is not indicative of future returns. This category / mutual fund scheme may or may not be suitable as per your risk appetite.</div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 600);
+};
+
+// ── SIP CALC EXPORT ──────────────────────────────────────────────────────────
+window.sipCalcExportPNG = async function() {
+  const snap = window._sipCalcSnapshot;
+  if (!snap) { showToast('No results to export', 'error'); return; }
+  const { results, bench, amt, freqLabel, startStr, endStr } = snap;
+  const okR = results.filter(r => r.ok);
+  const bestXirr = okR.length ? Math.max(...okR.map(r => r.xirr)) : 0;
+  const hasBench = !!bench;
+  const fmtV = v => { const a = Math.abs(v); return a >= 10000000 ? `₹${(v/10000000).toFixed(2)}Cr` : a >= 100000 ? `₹${(v/100000).toFixed(2)}L` : `₹${(v/1000).toFixed(1)}K`; };
+  const dateStr = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+
+  const rows = results.map((r, i) => {
+    if (!r.ok) return `<tr><td colspan="${hasBench?7:6}" style="color:#f05c78;padding:8px 12px;font-size:11px;">${r.name} — Error</td></tr>`;
+    const isBest = okR.length > 1 && r.xirr === bestXirr;
+    const xirrColor = r.xirr > 15 ? '#2dd4a0' : r.xirr > 8 ? '#e8aa2e' : r.xirr > 0 ? '#f5a623' : '#f05c78';
+    const gainColor = r.gain > 0 ? '#2dd4a0' : '#f05c78';
+    const alphaColor = r.alpha > 0 ? '#2dd4a0' : '#f05c78';
+    const bg = i % 2 === 0 ? '#0d1117' : '#0f1420';
+    return `<tr style="background:${bg};">
+      <td style="text-align:left;padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d0d8e8;">${isBest ? '🥇 ' : ''}${r.name}</td>
+      <td style="text-align:right;padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:${xirrColor};">${r.xirr.toFixed(2)}%</td>
+      <td style="text-align:right;padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9aa5b4;">${fmtV(r.invested)}</td>
+      <td style="text-align:right;padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:${r.finalVal > r.invested ? '#2dd4a0' : '#f05c78'};">${fmtV(r.finalVal)}</td>
+      <td style="text-align:right;padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:${gainColor};">${r.gain > 0 ? '+' : ''}${fmtV(r.gain)}</td>
+      <td style="text-align:right;padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:${gainColor};">${((r.gain/r.invested)*100).toFixed(1)}%</td>
+      ${hasBench ? `<td style="text-align:right;padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:${alphaColor};">${r.alpha > 0 ? '+' : ''}${r.alpha.toFixed(2)}%</td>` : ''}
+    </tr>`;
+  }).join('');
+
+  const thStyle = `text-align:right;padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;background:#111520;white-space:nowrap;`;
+
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;left:-9999px;top:0;width:820px;background:#0d1117;overflow:hidden;border-radius:10px;';
+  el.innerHTML = `
+    <div style="padding:16px 20px 14px;border-bottom:1px solid #2a2f3a;display:flex;justify-content:space-between;align-items:flex-start;background:#080b12;">
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:#e8aa2e;letter-spacing:2px;">MF · RESEARCH</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:#c0c8d8;margin-top:5px;">SIP Calculator</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6b7280;margin-top:3px;">${freqLabel} SIP · ₹${amt.toLocaleString('en-IN')}/instalment · ${startStr} → ${endStr}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#e8aa2e;">VED Investment</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa5b4;margin-top:2px;">Vivek Vijaykumar Chawla</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa5b4;">ARN-253228 · EUIN E472276</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b7280;margin-top:2px;">${dateStr}</div>
+      </div>
+    </div>
+    ${hasBench ? `<div style="padding:9px 20px;background:#111520;border-bottom:1px solid #2a2f3a;display:flex;align-items:center;gap:16px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;">Benchmark</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#c0c8d8;">${bench.name}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#9aa5b4;">${bench.xirr.toFixed(2)}% XIRR</span>
+    </div>` : ''}
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="text-align:left;padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;background:#111520;">Fund</th>
+        <th style="${thStyle}">XIRR</th>
+        <th style="${thStyle}">Invested</th>
+        <th style="${thStyle}">Final Value</th>
+        <th style="${thStyle}">Gain / Loss</th>
+        <th style="${thStyle}">Abs Return</th>
+        ${hasBench ? `<th style="${thStyle}">Alpha vs Bench</th>` : ''}
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="padding:8px 12px;border-top:1px solid #1e2430;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#555;">* ${freqLabel} SIP · XIRR via Newton-Raphson${hasBench ? ' · Alpha = Fund XIRR − Benchmark XIRR' : ''}</span>
+    </div>
+    <div style="padding:10px 20px;border-top:1px solid #2a2f3a;display:flex;justify-content:space-between;align-items:center;background:#080b12;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#e8aa2e;font-weight:700;">VED Investment · Vivek Vijaykumar Chawla · ARN-253228</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#555;">${dateStr}</div>
+    </div>
+    <div style="padding:8px 20px 10px;background:#0a0d14;border-top:1px solid #1e2430;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#777;text-align:center;line-height:1.7;">Mutual fund investments are subject to market risks, read all scheme related documents carefully.<br>Past performance is not indicative of future returns. This mutual fund scheme may or may not be suitable as per your risk appetite.</div>
+    </div>`;
+
+  document.body.appendChild(el);
+  showToast('Capturing…', '');
+  try {
+    const canvas = await html2canvas(el, { backgroundColor:'#0d1117', scale:2, useCORS:true, logging:false });
+    const link = document.createElement('a');
+    link.download = `SIP-Calc-${new Date().toISOString().slice(0,10)}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('PNG downloaded', 'success');
+  } catch(e) {
+    showToast('Export failed', 'error');
+  } finally {
+    el.remove();
+  }
+};
+
+window.sipCalcExportPDF = function() {
+  const area = document.getElementById('sipCalcPrintArea');
+  if (!area) { showToast('No results to export', 'error'); return; }
+  const meta = window._sipCalcMeta || '';
+  const tableHTML = area.querySelector('table')?.outerHTML || '';
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>SIP Calc — VED Investment</title>
+    <style>
+      * { margin:0; padding:0; box-sizing:border-box; }
+      body { font-family:'IBM Plex Mono',monospace; font-size:11px; color:#1a1a1a; background:#fff; padding:24px 28px; }
+      @media print { body { padding:10px; } @page { margin:12mm; size:A4 landscape; } .no-print { display:none !important; } }
+      .hdr { border-bottom:3px solid #1a1a1a; padding-bottom:12px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-end; }
+      .hdr-title { font-size:16px; font-weight:700; color:#1a1a1a; }
+      .hdr-meta { font-size:10px; color:#555; margin-top:4px; }
+      .hdr-right { font-size:10px; color:#555; text-align:right; }
+      table { width:100%; border-collapse:collapse; font-size:10px; }
+      th { background:#f3f4f6; padding:6px 8px; text-align:right; font-size:8px; text-transform:uppercase; letter-spacing:1px; color:#555; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+      th:first-child { text-align:left; }
+      td { padding:5px 8px; border-bottom:1px solid #f3f4f6; text-align:right; white-space:nowrap; }
+      td:first-child { text-align:left; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
+      tr:nth-child(even) td { background:#fafafa; }
+      tr:last-child td { border-bottom:none; }
+      .footer { margin-top:16px; font-size:10px; color:#444; line-height:1.7; border-top:1px solid #e5e7eb; padding-top:12px; }
+      .print-btn { margin-bottom:16px; }
+      button { background:#1a1a1a; color:#fff; border:none; padding:7px 18px; border-radius:4px; cursor:pointer; font-size:12px; }
+    </style>
+  </head><body>
+    <div class="no-print print-btn"><button onclick="window.print()">🖨 Print / Save as PDF</button></div>
+    <div class="hdr">
+      <div>
+        <div class="hdr-title">SIP Calculator — VED Investment</div>
+        <div class="hdr-meta">${meta}</div>
+      </div>
+      <div class="hdr-right">VED Investment · ARN-253228<br>Vivek Vijaykumar Chawla<br>${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
+    </div>
+    ${tableHTML}
+    <div class="footer">* XIRR via Newton-Raphson · Alpha = Fund XIRR − Benchmark XIRR<br><br>Mutual fund investments are subject to market risks, read all scheme related documents carefully. Past performance is not indicative of future returns. This category / mutual fund scheme may or may not be suitable as per your risk appetite.</div>
   </body></html>`);
   win.document.close();
   setTimeout(() => win.print(), 600);
