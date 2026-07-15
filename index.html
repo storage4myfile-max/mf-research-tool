@@ -518,6 +518,58 @@
   /* ── PTP RESULT ─────────────────────────────── */
   .ptp-result { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
 
+  /* ── SWP BUCKET CARDS ───────────────────────── */
+  .swp-bucket-card {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    transition: border-color 0.2s;
+  }
+  .swp-bucket-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 0;
+  }
+  .swp-bucket-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .swp-label-input {
+    flex: 1;
+    font-size: 11px !important;
+    font-weight: 600;
+    padding: 5px 10px !important;
+  }
+  .swp-mode-btn {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 600;
+  }
+  .swp-mode-btn.active-mode {
+    background: var(--accent);
+    color: #08090e;
+    border-color: var(--accent);
+  }
+  .swp-mode-btn:not(.active-mode):hover { border-color: var(--text2); color: var(--text); }
+  .swp-refill-box {
+    background: #080b12;
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+  }
+
   .ptp-stat { background:var(--surface2); border-radius:var(--radius); padding:14px; border:1px solid var(--border); }
   .ptp-stat-label { font-size:9px; font-family:var(--mono); color:var(--text3); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:8px; }
   .ptp-stat-val { font-size:20px; font-weight:600; font-family:var(--mono); }
@@ -912,6 +964,7 @@
     <div class="nav-tab" onclick="switchPage('ptpcalc')">PTP Calc</div>
     <div class="nav-tab" onclick="switchPage('rollingcalc')">Rolling Calc</div>
     <div class="nav-tab" onclick="switchPage('stepupcalc')">Step-Up SIP</div>
+    <div class="nav-tab" onclick="switchPage('swpcalc')">SWP Calc</div>
     <div class="nav-tab" onclick="switchPage('chartcmp')">Chart Compare</div>
     <div class="nav-tab" onclick="switchPage('catscanner')">Category Scan</div>
     <div class="nav-tab" onclick="switchPage('lumpsip')">Lump+SIP</div>
@@ -967,6 +1020,7 @@
       <div class="mobile-nav-item" id="mnav-ptpcalc" onclick="mobileNav('ptpcalc')"><span class="mobile-nav-icon">📍</span>PTP Returns</div>
       <div class="mobile-nav-item" id="mnav-rollingcalc" onclick="mobileNav('rollingcalc')"><span class="mobile-nav-icon">🔄</span>Rolling Returns</div>
       <div class="mobile-nav-item" id="mnav-stepupcalc" onclick="mobileNav('stepupcalc')"><span class="mobile-nav-icon">📶</span>Step-Up SIP</div>
+      <div class="mobile-nav-item" id="mnav-swpcalc" onclick="mobileNav('swpcalc')"><span class="mobile-nav-icon">💸</span>SWP Calc</div>
       <div class="mobile-nav-item" id="mnav-lumpsip" onclick="mobileNav('lumpsip')"><span class="mobile-nav-icon">💰</span>Lump+SIP</div>
       <div class="mobile-nav-item" id="mnav-goalcalc" onclick="mobileNav('goalcalc')"><span class="mobile-nav-icon">🎯</span>Goal Calc</div>
     </div>
@@ -1253,8 +1307,9 @@
     <div class="page" id="page-ptpcalc">
       <div class="section-title">Point-to-Point Returns Calculator</div>
       <div class="ptp-card">
-        <div class="input-row" style="align-items:flex-end; margin-bottom:20px; flex-wrap:wrap;">
-          <div class="input-group" style="min-width:240px;">
+        <!-- Row 1: Benchmark -->
+        <div class="input-row" style="align-items:flex-end; margin-bottom:16px; flex-wrap:wrap;">
+          <div class="input-group" style="flex:1; min-width:240px; max-width:480px;">
             <label class="input-label">Benchmark (shared)</label>
             <div style="position:relative;">
               <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
@@ -1269,6 +1324,9 @@
             <div id="ptpBenchPills" style="margin-top:8px;"></div>
             </div>
           </div>
+        </div>
+        <!-- Row 2: Dates + Amount -->
+        <div class="input-row" style="align-items:flex-end; margin-bottom:20px; flex-wrap:wrap;">
           <div class="input-group">
             <label class="input-label">From Date</label>
             <input class="input-field" type="date" id="ptpFrom" style="width:150px;">
@@ -1311,8 +1369,9 @@
           </button>
         </div>
 
-        <div class="input-row" style="align-items:flex-end; margin-bottom:20px; flex-wrap:wrap;">
-          <div class="input-group" style="min-width:240px;">
+        <!-- Row 1: Benchmark -->
+        <div class="input-row" style="align-items:flex-end; margin-bottom:16px; flex-wrap:wrap;">
+          <div class="input-group" style="flex:1; min-width:240px; max-width:480px;">
             <label class="input-label">Benchmark (shared)</label>
             <div style="position:relative;">
               <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border2);border-radius:6px;padding:8px 12px;">
@@ -1333,6 +1392,9 @@
             <div id="rollingBenchPills" style="margin-top:8px;"></div>
             </div>
           </div>
+        </div>
+        <!-- Row 2: Window + SIP Amt + Dates -->
+        <div class="input-row" style="align-items:flex-end; margin-bottom:20px; flex-wrap:wrap;">
           <div class="input-group">
             <label class="input-label">Rolling Window</label>
             <select class="input-field" id="rollingWindow" style="width:130px;">
@@ -1424,6 +1486,74 @@
           <span id="stepupSlotCount" style="font-size:11px;font-family:var(--mono);color:var(--text3);"></span>
         </div>
         <div id="stepupCalcResult" style="margin-top:24px;"></div>
+      </div>
+    </div>
+
+    <!-- SWP BUCKET CALCULATOR PAGE -->
+    <div class="page" id="page-swpcalc">
+      <div class="section-title" style="margin-bottom:16px;">SWP Bucket Calculator</div>
+      <div class="ptp-card">
+
+        <!-- Mode toggle -->
+        <div style="display:flex;gap:8px;margin-bottom:20px;align-items:center;">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-right:4px;">Mode:</span>
+          <button id="swp-mode-hist" class="swp-mode-btn active-mode" onclick="swpSetMode('historical')">Historical (Actual NAV)</button>
+          <button id="swp-mode-fwd"  class="swp-mode-btn"             onclick="swpSetMode('forward')">Forward Projection</button>
+        </div>
+
+        <!-- Row 1: Global settings -->
+        <div class="input-row" style="margin-bottom:16px;">
+          <div class="input-group">
+            <label class="input-label">Monthly Withdrawal (₹)</label>
+            <input class="input-field" type="number" id="swp-monthly" value="20000" style="width:150px;">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Inflation (% p.a.)</label>
+            <input class="input-field" type="number" id="swp-inflation" value="6" step="0.5" style="width:100px;">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Period (Years)</label>
+            <input class="input-field" type="number" id="swp-years" value="20" style="width:100px;">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Simulation Start Date <span style="font-size:9px;color:var(--text3);">(1st SWP date)</span></label>
+            <input class="input-field" type="date" id="swp-simstart" style="width:160px;">
+          </div>
+        </div>
+
+        <!-- Refill settings -->
+        <div class="swp-refill-box">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">⟳ Refill Rules</div>
+          <div class="input-row" style="margin-bottom:0;gap:16px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">B2 → B1: trigger when B1 &lt;</span>
+              <input class="input-field" type="number" id="swp-b2b1-trigger" value="12" style="width:64px;padding:5px 8px;">
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">months · refill B1 to</span>
+              <input class="input-field" type="number" id="swp-b1-target" value="36" style="width:64px;padding:5px 8px;">
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">months</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">B3 → B2: trigger when B2 ≤</span>
+              <input class="input-field" type="number" id="swp-higher-trigger" value="24" style="width:64px;padding:5px 8px;">
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">months · refill B2 to</span>
+              <input class="input-field" type="number" id="swp-higher-target" value="60" style="width:64px;padding:5px 8px;">
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">months &nbsp;<span style="color:var(--text3);">(applies to all higher bucket pairs)</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bucket cards -->
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Buckets</div>
+        <div id="swpBucketContainer"></div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+          <button class="btn btn-secondary" onclick="swpAddBucket()" id="swpAddBucketBtn">+ Add Bucket</button>
+          <button class="btn btn-primary"   onclick="runSWPCalc()">▶ Run Simulation</button>
+          <button class="btn btn-secondary" onclick="swpClearAll()" style="color:var(--danger);border-color:var(--danger);">✕ Clear</button>
+        </div>
+
+        <div id="swpResult" style="margin-top:28px;"></div>
       </div>
     </div>
 
@@ -4265,7 +4395,7 @@ window.calcRollingMulti = async function() {
 window.switchPage = function(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${page}`)?.classList.add('active');
-  const pages = ['fund','compare','sipcalc','ptpcalc','rollingcalc','stepupcalc','chartcmp','catscanner','lumpsip','goalcalc','corrmatrix','fundmgr','catheatmap'];
+  const pages = ['fund','compare','sipcalc','ptpcalc','rollingcalc','stepupcalc','swpcalc','chartcmp','catscanner','lumpsip','goalcalc','corrmatrix','fundmgr','catheatmap'];
   document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', pages[i] === page));
   updateBottomNav(page);
   updateDrawerNav(page);
@@ -7695,6 +7825,482 @@ window.csrExportPDF = function() {
   win.document.close();
   setTimeout(() => win.print(), 600);
 };
+
+// ── SWP BUCKET CALCULATOR ─────────────────────────────────────────────────────
+
+const BUCKET_COLORS  = ['#2dd4a0','#e8aa2e','#6ab0f5','#b07af5','#f05c78'];
+const BUCKET_LABELS  = ['B1 — Liquid','B2 — Debt / Hybrid','B3 — Equity','B4 — Equity','B5 — Equity'];
+const BUCKET_RTNS    = [7, 10, 13, 13, 13];
+
+let _swpMode = 'historical';
+let _swpChart = null;
+let _swpBuckets = [
+  { id:0, code:'', name:'', label:'B1 — Liquid',        investDate:'', amount:500000,  returnPct:7  },
+  { id:1, code:'', name:'', label:'B2 — Debt / Hybrid', investDate:'', amount:1000000, returnPct:10 },
+  { id:2, code:'', name:'', label:'B3 — Equity',        investDate:'', amount:2000000, returnPct:13 },
+];
+let _swpNextId = 3;
+const _swpTimers = {};
+
+window.swpSetMode = function(mode) {
+  _swpMode = mode;
+  document.getElementById('swp-mode-hist')?.classList.toggle('active-mode', mode === 'historical');
+  document.getElementById('swp-mode-fwd')?.classList.toggle('active-mode', mode === 'forward');
+  swpRenderBuckets();
+};
+
+window.swpAddBucket = function() {
+  if (_swpBuckets.length >= 5) { showToast('Maximum 5 buckets', 'error'); return; }
+  const idx = _swpBuckets.length;
+  _swpBuckets.push({ id:_swpNextId++, code:'', name:'', label:BUCKET_LABELS[idx]||`B${idx+1}`, investDate:'', amount:2000000, returnPct:BUCKET_RTNS[idx]||13 });
+  swpRenderBuckets();
+};
+
+window.swpRemoveBucket = function(id) {
+  if (_swpBuckets.length <= 1) { showToast('Need at least 1 bucket', 'error'); return; }
+  _swpBuckets = _swpBuckets.filter(b => b.id !== id);
+  swpRenderBuckets();
+};
+
+window.swpClearAll = function() {
+  _swpBuckets = [
+    { id:0, code:'', name:'', label:'B1 — Liquid',        investDate:'', amount:500000,  returnPct:7  },
+    { id:1, code:'', name:'', label:'B2 — Debt / Hybrid', investDate:'', amount:1000000, returnPct:10 },
+    { id:2, code:'', name:'', label:'B3 — Equity',        investDate:'', amount:2000000, returnPct:13 },
+  ];
+  _swpNextId = 3;
+  swpRenderBuckets();
+  const r = document.getElementById('swpResult');
+  if (r) r.innerHTML = '';
+  if (_swpChart) { _swpChart.destroy(); _swpChart = null; }
+};
+
+function swpRenderBuckets() {
+  const container = document.getElementById('swpBucketContainer');
+  if (!container) return;
+  const isHist = _swpMode === 'historical';
+  container.innerHTML = _swpBuckets.map((b, i) => {
+    const color = BUCKET_COLORS[i] || '#aaa';
+    return `<div class="swp-bucket-card" id="swp-bcard-${b.id}">
+      <div class="swp-bucket-header">
+        <div class="swp-bucket-dot" style="background:${color};"></div>
+        <input class="input-field swp-label-input" type="text" value="${b.label.replace(/"/g,"'")}"
+          onchange="_swpBuckets.find(x=>x.id===${b.id}).label=this.value"
+          style="flex:1;color:${color};border-color:${color}44;">
+        ${_swpBuckets.length > 1
+          ? `<button class="btn btn-secondary" onclick="swpRemoveBucket(${b.id})"
+               style="padding:4px 10px;font-size:10px;color:var(--danger);border-color:var(--danger);">✕</button>` : ''}
+      </div>
+      <div class="input-row" style="margin-bottom:0;margin-top:12px;flex-wrap:wrap;">
+        ${isHist ? `
+        <div class="input-group" style="flex:1;min-width:220px;">
+          <label class="input-label">Fund</label>
+          <div style="position:relative;">
+            <input class="input-field" type="text" id="swp-finput-${b.id}"
+              placeholder="Search fund name…" value="${(b.name||'').substring(0,60).replace(/"/g,"'")}"
+              autocomplete="off" oninput="swpOnFundInput(${b.id},this.value)" style="width:100%;">
+            <div id="swp-fres-${b.id}" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;
+              background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+              max-height:220px;overflow-y:auto;z-index:400;box-shadow:0 8px 32px rgba(0,0,0,.5);"></div>
+          </div>
+          <div style="font-size:10px;font-family:var(--mono);color:${b.code?'#2dd4a0':'var(--text3)'};margin-top:3px;">
+            ${b.code ? '✓ '+b.code : 'not selected'}</div>
+        </div>` : `
+        <div class="input-group">
+          <label class="input-label">Expected Return (% p.a.)</label>
+          <input class="input-field" type="number" value="${b.returnPct}" step="0.5" style="width:130px;"
+            onchange="_swpBuckets.find(x=>x.id===${b.id}).returnPct=+this.value">
+        </div>`}
+        <div class="input-group">
+          <label class="input-label">Investment Date</label>
+          <input class="input-field" type="date" value="${b.investDate}"
+            onchange="_swpBuckets.find(x=>x.id===${b.id}).investDate=this.value" style="width:150px;">
+        </div>
+        <div class="input-group">
+          <label class="input-label">Amount (₹)</label>
+          <input class="input-field" type="number" value="${b.amount}" style="width:140px;"
+            onchange="_swpBuckets.find(x=>x.id===${b.id}).amount=+this.value">
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  const addBtn = document.getElementById('swpAddBucketBtn');
+  if (addBtn) addBtn.style.opacity = _swpBuckets.length >= 5 ? '0.4' : '1';
+  setTimeout(() => {
+    document.addEventListener('click', e => {
+      _swpBuckets.forEach(b => {
+        if (!e.target.closest(`#swp-bcard-${b.id}`)) {
+          const r = document.getElementById(`swp-fres-${b.id}`);
+          if (r) r.style.display = 'none';
+        }
+      });
+    }, { once: true });
+  }, 0);
+}
+
+window.swpOnFundInput = function(id, val) {
+  const b = _swpBuckets.find(x => x.id === id);
+  if (b) { b.code = ''; b.name = val; }
+  const resEl = document.getElementById(`swp-fres-${id}`);
+  if (!resEl) return;
+  clearTimeout(_swpTimers[id]);
+  if (val.trim().length < 2) { resEl.style.display = 'none'; return; }
+  _swpTimers[id] = setTimeout(async () => {
+    const results = await searchFunds(val.trim());
+    if (!results.length) { resEl.style.display = 'none'; return; }
+    resEl.innerHTML = results.map(f => `
+      <div class="search-result-item" onclick="swpSelectFund(${id},'${f.schemeCode}',\`${f.schemeName.replace(/`/g,"'")}\`)">
+        <div class="result-name">${f.schemeName}</div>
+        <div class="result-meta">${f.schemeCode}</div>
+      </div>`).join('');
+    resEl.style.display = 'block';
+  }, 300);
+};
+
+window.swpSelectFund = function(id, code, name) {
+  const b = _swpBuckets.find(x => x.id === id);
+  if (!b) return;
+  b.code = code; b.name = name;
+  swpRenderBuckets();
+};
+
+function swpFindNav(navArr, date) {
+  const t = date.getTime();
+  for (let i = navArr.length - 1; i >= 0; i--) {
+    if (navArr[i].date.getTime() <= t) return navArr[i];
+  }
+  return navArr[0] || null;
+}
+
+function swpFmt(v) {
+  if (Math.abs(v) >= 10000000) return `\u20b9${(v/10000000).toFixed(2)}Cr`;
+  if (Math.abs(v) >= 100000)   return `\u20b9${(v/100000).toFixed(2)}L`;
+  return `\u20b9${Math.round(v).toLocaleString('en-IN')}`;
+}
+
+function addMonths(date, m) {
+  const d   = new Date(date);
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + m);
+  const last = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(day, last));
+  return d;
+}
+
+function simulateSWP(buckets, navDataArr, settings, mode) {
+  const { monthlyWithdrawal, inflationPct, totalMonths, simStart,
+          b2b1Trigger, b1Target, higherTrigger, higherTarget } = settings;
+  const nB = buckets.length;
+
+  const state = buckets.map((b, i) => {
+    if (mode === 'historical') {
+      const navArr = navDataArr[i];
+      const nav = swpFindNav(navArr, new Date(b.investDate || simStart));
+      const units = (nav && nav.nav > 0) ? b.amount / nav.nav : 0;
+      return { units, navArr };
+    } else {
+      let corpus = b.amount;
+      if (b.investDate) {
+        const mDiff = (new Date(simStart) - new Date(b.investDate)) / (1000*60*60*24*30.44);
+        if (mDiff > 0) corpus = b.amount * Math.pow(1 + b.returnPct/100/12, mDiff);
+      }
+      return { corpus: Math.max(corpus, 0) };
+    }
+  });
+
+  const results = [];
+  const monthlyInflMult = Math.pow(1 + inflationPct/100, 1/12);
+  let currentWithdrawal = monthlyWithdrawal;
+
+  for (let m = 0; m < totalMonths; m++) {
+    const date = addMonths(new Date(simStart), m);
+    if (m > 0) currentWithdrawal *= monthlyInflMult;
+
+    // Step 1: current corpus
+    const corpuses = state.map((s, i) => {
+      if (mode === 'historical') {
+        const nav = swpFindNav(s.navArr, date);
+        return (nav && nav.nav > 0) ? s.units * nav.nav : 0;
+      } else {
+        s.corpus *= (1 + buckets[i].returnPct/100/12);
+        return Math.max(0, s.corpus);
+      }
+    });
+
+    // Step 2: refill cascade top-down
+    const refillEvents = [];
+    for (let i = nB-1; i >= 1; i--) {
+      const upper = i, lower = i-1;
+      const trigger   = (lower === 0 ? b2b1Trigger   : higherTrigger) * currentWithdrawal;
+      const targetAmt = (lower === 0 ? b1Target       : higherTarget)  * currentWithdrawal;
+      if (corpuses[lower] < trigger && corpuses[upper] > 0) {
+        const needed = Math.min(Math.max(0, targetAmt - corpuses[lower]), corpuses[upper]);
+        if (needed > 0.01) {
+          if (mode === 'historical') {
+            const navU = swpFindNav(state[upper].navArr, date);
+            const navL = swpFindNav(state[lower].navArr, date);
+            if (navU?.nav > 0) state[upper].units -= needed / navU.nav;
+            if (navL?.nav > 0) state[lower].units += needed / navL.nav;
+            state[upper].units = Math.max(0, state[upper].units);
+          } else {
+            state[upper].corpus = Math.max(0, state[upper].corpus - needed);
+            state[lower].corpus += needed;
+          }
+          corpuses[upper] = Math.max(0, corpuses[upper] - needed);
+          corpuses[lower] += needed;
+          refillEvents.push({ from:upper, to:lower, amount:needed });
+        }
+      }
+    }
+
+    // Step 3: withdraw from B1, cascade upward if insufficient
+    let remaining = currentWithdrawal, paid = 0;
+    for (let i = 0; i < nB && remaining > 0.01; i++) {
+      if (corpuses[i] <= 0) continue;
+      const take = Math.min(remaining, corpuses[i]);
+      if (mode === 'historical') {
+        const nav = swpFindNav(state[i].navArr, date);
+        if (nav?.nav > 0) state[i].units -= take / nav.nav;
+        state[i].units = Math.max(0, state[i].units);
+      } else {
+        state[i].corpus = Math.max(0, state[i].corpus - take);
+      }
+      corpuses[i] = Math.max(0, corpuses[i] - take);
+      remaining -= take;
+      paid += take;
+    }
+
+    const totalCorpus = corpuses.reduce((a,c) => a+c, 0);
+    results.push({
+      month: m+1, date,
+      corpuses: corpuses.map(c => Math.max(0,c)),
+      totalCorpus: Math.max(0, totalCorpus),
+      withdrawal: paid, shortfall: Math.max(0, remaining),
+      refillEvents, inflWithdrawal: currentWithdrawal,
+    });
+    if (totalCorpus <= 0.01) break;
+  }
+  return results;
+}
+
+window.runSWPCalc = async function() {
+  const resultEl = document.getElementById('swpResult');
+  if (!resultEl) return;
+
+  const monthlyWithdrawal = +document.getElementById('swp-monthly').value   || 20000;
+  const inflationPct      = +document.getElementById('swp-inflation').value  || 6;
+  const simYears          = +document.getElementById('swp-years').value      || 20;
+  const simStartStr       =  document.getElementById('swp-simstart').value;
+  const b2b1Trigger       = +document.getElementById('swp-b2b1-trigger').value  || 12;
+  const b1Target          = +document.getElementById('swp-b1-target').value     || 36;
+  const higherTrigger     = +document.getElementById('swp-higher-trigger').value || 24;
+  const higherTarget      = +document.getElementById('swp-higher-target').value  || 60;
+
+  if (!simStartStr) { showToast('Please set a simulation start date', 'error'); return; }
+
+  if (_swpMode === 'historical') {
+    const missing = _swpBuckets.find(b => !b.code || !b.investDate || !b.amount);
+    if (missing) { showToast('Fill fund, investment date & amount for all buckets', 'error'); return; }
+  } else {
+    if (_swpBuckets.find(b => !b.amount)) { showToast('Fill corpus amount for all buckets', 'error'); return; }
+  }
+
+  const settings = { monthlyWithdrawal, inflationPct, totalMonths: simYears*12,
+    simStart: simStartStr, b2b1Trigger, b1Target, higherTrigger, higherTarget };
+
+  resultEl.innerHTML = `<div class="loading-wrap"><div class="spinner"></div>
+    <span>${_swpMode === 'historical' ? 'Loading NAV data for all buckets…' : 'Running projection…'}</span></div>`;
+
+  try {
+    let navDataArr = null;
+    if (_swpMode === 'historical') {
+      navDataArr = await Promise.all(_swpBuckets.map(async b => {
+        const d = await getNav(b.code);
+        return d.data.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) }))
+          .filter(n => !isNaN(n.nav)).reverse();
+      }));
+    }
+    const results = simulateSWP(_swpBuckets, navDataArr, settings, _swpMode);
+    renderSWPResults(results, _swpBuckets, settings);
+  } catch(e) {
+    resultEl.innerHTML = `<div style="color:var(--negative);font-family:var(--mono);font-size:12px;padding:16px;">
+      Error: ${e.message}</div>`;
+    console.error('SWP error:', e);
+  }
+};
+
+function renderSWPResults(results, buckets, settings) {
+  const resultEl = document.getElementById('swpResult');
+  if (!resultEl) return;
+  if (_swpChart) { _swpChart.destroy(); _swpChart = null; }
+
+  const totalInvested  = buckets.reduce((a,b) => a+b.amount, 0);
+  const totalWithdrawn = results.reduce((a,r) => a+r.withdrawal, 0);
+  const finalCorpus    = results[results.length-1]?.totalCorpus || 0;
+  const monthsSurvived = results.length;
+  const yearsSurvived  = (monthsSurvived/12).toFixed(1);
+  const fullPeriod     = monthsSurvived >= settings.totalMonths;
+  const hasShortfall   = results.some(r => r.shortfall > 0.01);
+  const totalRefills   = results.reduce((a,r) => a+r.refillEvents.length, 0);
+
+  const statusColor = fullPeriod && !hasShortfall ? '#2dd4a0' : hasShortfall ? '#f05c78' : '#e8aa2e';
+  const statusTxt   = fullPeriod && !hasShortfall
+    ? `\u2713 Survived full ${settings.totalMonths/12}Y`
+    : hasShortfall ? `\u26a0 Shortfall occurred`
+    : `Corpus lasted ${yearsSurvived}Y`;
+
+  const cards = [
+    ['Total Invested',  swpFmt(totalInvested),  'var(--text)'],
+    ['Total Withdrawn', swpFmt(totalWithdrawn),  '#2dd4a0'],
+    ['Final Corpus',    swpFmt(finalCorpus),     finalCorpus>0?'#2dd4a0':'#f05c78'],
+    ['Duration',        `${monthsSurvived}mo (${yearsSurvived}Y)`, statusColor],
+    ['Status',          statusTxt,               statusColor],
+    ['Refill Events',   String(totalRefills),    '#e8aa2e'],
+  ];
+
+  const summaryHTML = `
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
+    ${cards.map(([lbl,val,col]) => `
+    <div style="background:var(--surface3);border:1px solid var(--border2);border-radius:8px;padding:12px 14px;">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;">${lbl}</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${col};">${val}</div>
+    </div>`).join('')}
+  </div>`;
+
+  const chartHTML = `
+  <div style="background:var(--surface3);border:1px solid var(--border2);border-radius:8px;padding:16px;margin-bottom:20px;">
+    <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">Corpus Over Time</div>
+    <div style="position:relative;height:280px;"><canvas id="swpChart"></canvas></div>
+  </div>`;
+
+  const thS = 'padding:7px 10px;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border2);background:var(--surface3);text-align:right;white-space:nowrap;';
+  const tdS = 'padding:6px 10px;font-family:var(--mono);font-size:11px;color:var(--text);text-align:right;border-bottom:1px solid #1a1f2a;white-space:nowrap;';
+
+  const hdrs = [`<th style="${thS}text-align:left;">Month</th>`,`<th style="${thS}text-align:left;">Date</th>`,
+    ...buckets.map((b,i)=>`<th style="${thS}color:${BUCKET_COLORS[i]};">${b.label.split('\u2014')[0].trim()}</th>`),
+    `<th style="${thS}">Total</th>`,`<th style="${thS}">Withdrawal</th>`,
+    `<th style="${thS}">Cumul. Drawn</th>`,`<th style="${thS}text-align:left;">Events</th>`,
+  ].join('');
+
+  let cumD = 0;
+  const rows = results
+    .filter((r,i) => i%3===0 || i===results.length-1)
+    .map(r => {
+      cumD += r.withdrawal;
+      const evts = r.refillEvents.map(e=>`B${e.from+1}\u2192B${e.to+1} ${swpFmt(e.amount)}`).join(' \u00b7 ');
+      const bg   = r.shortfall>0.01 ? 'background:rgba(240,92,120,0.07);'
+                 : evts ? 'background:rgba(232,170,46,0.05);' : '';
+      return `<tr style="${bg}">
+        <td style="${tdS}text-align:left;color:var(--text3);">${r.month}</td>
+        <td style="${tdS}text-align:left;">${r.date.toLocaleDateString('en-IN',{month:'short',year:'numeric'})}</td>
+        ${r.corpuses.map((c,i)=>`<td style="${tdS}color:${BUCKET_COLORS[i]};">${swpFmt(c)}</td>`).join('')}
+        <td style="${tdS}font-weight:600;">${swpFmt(r.totalCorpus)}</td>
+        <td style="${tdS}color:${r.shortfall>0.01?'#f05c78':'#2dd4a0'};">${swpFmt(r.withdrawal)}</td>
+        <td style="${tdS}color:var(--text2);">${swpFmt(cumD)}</td>
+        <td style="${tdS}text-align:left;font-size:9px;color:var(--accent);">${evts}</td>
+      </tr>`;
+    }).join('');
+
+  const tableHTML = `
+  <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;overflow:hidden;">
+    <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border2);">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;">
+        Month-by-Month &nbsp;<span style="opacity:0.6;">(every 3rd · gold=refill · red=shortfall)</span></div>
+      <button class="btn-export csv" onclick="swpExportCSV()">&#8595; CSV</button>
+    </div>
+    <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>${hdrs}</tr></thead><tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="padding:8px 16px;border-top:1px solid var(--border2);">
+      <span style="font-family:var(--mono);font-size:9px;color:var(--text3);">
+        * Refill: B2\u2192B1 when B1 &lt; ${settings.b2b1Trigger}mo, top to ${settings.b1Target}mo \u00b7
+        Higher buckets: trigger ${settings.higherTrigger}mo, top to ${settings.higherTarget}mo \u00b7
+        Inflation: ${settings.inflationPct}% p.a. compounded monthly
+      </span>
+    </div>
+  </div>`;
+
+  resultEl.innerHTML = summaryHTML + chartHTML + tableHTML;
+  window._swpResults     = results;
+  window._swpBucketsSnap = buckets;
+  window._swpSettings    = settings;
+
+  requestAnimationFrame(() => swpRenderChart(results, buckets));
+}
+
+function swpRenderChart(results, buckets) {
+  const canvas = document.getElementById('swpChart');
+  if (!canvas) return;
+  if (_swpChart) { _swpChart.destroy(); _swpChart = null; }
+
+  const sampled  = results.filter((_,i) => i%3===0 || i===results.length-1);
+  const labels   = sampled.map(r => r.date.toLocaleDateString('en-IN',{month:'short',year:'2-digit'}));
+
+  const datasets = buckets.map((b,i) => ({
+    label: b.label.split('\u2014')[0].trim(),
+    data: sampled.map(r => Math.round(r.corpuses[i])),
+    borderColor: BUCKET_COLORS[i],
+    backgroundColor: BUCKET_COLORS[i]+'18',
+    borderWidth: 2, fill: true, tension: 0.35, pointRadius: 0,
+    order: buckets.length - i,
+  }));
+
+  datasets.push({
+    label: 'Total', data: sampled.map(r => Math.round(r.totalCorpus)),
+    borderColor:'#ffffff', backgroundColor:'transparent',
+    borderWidth:2.5, borderDash:[5,4], fill:false, tension:0.35, pointRadius:0, order:0,
+  });
+
+  _swpChart = new Chart(canvas, {
+    type: 'line', data: { labels, datasets },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction: { mode:'index', intersect:false },
+      scales: {
+        x: { ticks:{ color:'#6b7280', font:{family:'IBM Plex Mono',size:9}, maxTicksLimit:14 }, grid:{ color:'rgba(255,255,255,0.03)' } },
+        y: { ticks:{ color:'#6b7280', font:{family:'IBM Plex Mono',size:9},
+              callback: v => v>=10000000?`${(v/10000000).toFixed(1)}Cr`:v>=100000?`${(v/100000).toFixed(0)}L`:v },
+             grid:{ color:'rgba(255,255,255,0.04)' } }
+      },
+      plugins: {
+        legend: { labels:{ color:'#9aa5b4', font:{family:'IBM Plex Mono',size:10}, boxWidth:14 } },
+        tooltip: { backgroundColor:'#0d1117', borderColor:'#2a2f3a', borderWidth:1,
+          callbacks:{ label: ctx => ` ${ctx.dataset.label}: ${swpFmt(ctx.raw)}` } }
+      }
+    }
+  });
+}
+
+window.swpExportCSV = function() {
+  const results = window._swpResults;
+  const buckets = window._swpBucketsSnap;
+  if (!results) return;
+  const hdrs = ['Month','Date',...buckets.map(b=>b.label),'Total Corpus','Withdrawal','Shortfall','Infl. Withdrawal','Events'];
+  let cumD = 0;
+  const rows = results.map(r => {
+    cumD += r.withdrawal;
+    return [
+      r.month,
+      r.date.toLocaleDateString('en-IN'),
+      ...r.corpuses.map(c=>Math.round(c)),
+      Math.round(r.totalCorpus), Math.round(r.withdrawal),
+      Math.round(r.shortfall),   Math.round(r.inflWithdrawal),
+      `"${r.refillEvents.map(e=>`B${e.from+1}->B${e.to+1} ${swpFmt(e.amount)}`).join('; ')}"`,
+    ].join(',');
+  });
+  const csv = [hdrs.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `SWP-Bucket-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  showToast('CSV downloaded', 'success');
+};
+
+// Init SWP buckets on page load
+setTimeout(() => { swpRenderBuckets(); }, 750);
 
 // ══════════════════════════════════════════════════════
 // CHANGELOG
