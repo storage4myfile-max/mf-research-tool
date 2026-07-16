@@ -2076,7 +2076,7 @@ function renderSearchResults(results) {
   const el = document.getElementById('searchResults');
   if (!results.length) { el.style.display = 'none'; return; }
   el.innerHTML = results.map(f => `
-    <div class="search-result-item" onclick="window._searchSelectFund('${f.schemeCode}', \`${f.schemeName.replace(/`/g,"'")}\`)">
+    <div class="search-result-item" onmousedown="window._searchSelectFund('${f.schemeCode}', \`${f.schemeName.replace(/`/g,"'")}\`)">
       <div class="result-name">${f.schemeName}</div>
       <div class="result-meta">${f.schemeCode}</div>
     </div>
@@ -2496,7 +2496,7 @@ function initFundRollBenchSearch() {
       const results = await searchFunds(q);
       if (!results.length) { res.style.display='none'; return; }
       res.innerHTML = results.slice(0,7).map(f => `
-        <div onclick="window._selectFundRollBench('${f.schemeCode}','${f.schemeName.replace(/'/g,"\\'")}')"
+        <div onmousedown="window._selectFundRollBench('${f.schemeCode}','${f.schemeName.replace(/'/g,"\\'")}')"
           style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:11px;font-family:var(--mono);color:var(--text);transition:background 0.1s;"
           onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
           <div>${f.schemeName.substring(0,55)}</div>
@@ -2603,7 +2603,7 @@ function initFundSIPBenchSearch() {
       const results = await searchFunds(q);
       if (!results.length) { res.style.display = 'none'; return; }
       res.innerHTML = results.slice(0, 7).map(f => `
-        <div onclick="window._selectFundSIPBench('${f.schemeCode}','${f.schemeName.replace(/'/g,"\\'")}')"
+        <div onmousedown="window._selectFundSIPBench('${f.schemeCode}','${f.schemeName.replace(/'/g,"\\'")}')"
           style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:11px;font-family:var(--mono);color:var(--text);transition:background 0.1s;"
           onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
           <div>${f.schemeName.substring(0,55)}</div>
@@ -3524,7 +3524,7 @@ window.onSlotInput = function(page, id, val) {
     const results = await searchFunds(val.trim());
     if (!results.length) { resEl.style.display = 'none'; return; }
     resEl.innerHTML = results.map(f => `
-      <div class="search-result-item" onclick="selectSlotFund('${page}',${id},'${f.schemeCode}',\`${f.schemeName.replace(/`/g,"'")}\`)">
+      <div class="search-result-item" onmousedown="selectSlotFund('${page}',${id},'${f.schemeCode}',\`${f.schemeName.replace(/`/g,"'")}\`)">
         <div class="result-name">${f.schemeName}</div>
         <div class="result-meta">${f.schemeCode}</div>
       </div>`).join('');
@@ -3829,7 +3829,7 @@ function initBenchSearch(tab) {
       const results = await searchFunds(q);
       if (!results.length) { res.style.display = 'none'; return; }
       res.innerHTML = results.slice(0, 8).map(f => `
-        <div onclick="window._selectBench('${tab}','${f.schemeCode}','${f.schemeName.replace(/'/g, "\\'")}')"
+        <div onmousedown="window._selectBench('${tab}','${f.schemeCode}','${f.schemeName.replace(/'/g, "\\'")}')"
           style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:11px;font-family:var(--mono);color:var(--text);transition:background 0.1s;"
           onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
           <div>${f.schemeName.substring(0, 60)}</div>
@@ -3899,7 +3899,7 @@ setTimeout(() => {
       const results = await searchFunds(q);
       if (!results.length) { res.style.display='none'; return; }
       res.innerHTML = results.slice(0,8).map(f => `
-        <div onclick="window._selectRollingBench('${f.schemeCode}','${f.schemeName.replace(/'/g,"\\'")}')"
+        <div onmousedown="window._selectRollingBench('${f.schemeCode}','${f.schemeName.replace(/'/g,"\\'")}')"
           style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:11px;font-family:var(--mono);color:var(--text);transition:background 0.1s;"
           onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
           <div>${f.schemeName.substring(0,60)}</div>
@@ -6429,7 +6429,7 @@ window.onDrawerSearch = function(val) {
     const results = await searchFunds(val.trim());
     if (!results.length) { res.style.display='none'; return; }
     res.innerHTML = results.slice(0,15).map(f=>`
-      <div class="search-result-item" onclick="addToWatchlist('${f.schemeCode}',\`${f.schemeName.replace(/`/g,"'")}\`);document.getElementById('drawerSearchResults').style.display='none';document.getElementById('drawerSearchInput').value='';">
+      <div class="search-result-item" onmousedown="addToWatchlist('${f.schemeCode}',\`${f.schemeName.replace(/`/g,"'")}\`);document.getElementById('drawerSearchResults').style.display='none';document.getElementById('drawerSearchInput').value='';">
         <div class="result-name">${f.schemeName}</div>
         <div class="result-meta">${f.schemeCode}</div>
       </div>`).join('');
@@ -7949,7 +7949,7 @@ window.swpOnFundInput = function(id, val) {
     const results = await searchFunds(val.trim());
     if (!results.length) { resEl.style.display = 'none'; return; }
     resEl.innerHTML = results.map(f => `
-      <div class="search-result-item" onclick="swpSelectFund(${id},'${f.schemeCode}',\`${f.schemeName.replace(/`/g,"'")}\`)">
+      <div class="search-result-item" onmousedown="swpSelectFund(${id},'${f.schemeCode}',\`${f.schemeName.replace(/`/g,"'")}\`)">
         <div class="result-name">${f.schemeName}</div>
         <div class="result-meta">${f.schemeCode}</div>
       </div>`).join('');
