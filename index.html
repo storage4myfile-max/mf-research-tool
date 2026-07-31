@@ -2142,12 +2142,6 @@ window.removeFromWatchlist = async function(code, e) {
 
 function renderWatchlist() {
   syncDrawerWatchlist();
-  // Refresh home screen if visible
-  const homeEl = document.getElementById('homeScreen');
-  const fundPage = document.getElementById('page-fund');
-  if (homeEl && fundPage && fundPage.classList.contains('active') && !document.getElementById('fundContent')?.querySelector('.fund-header-card')) {
-    renderHomeScreen();
-  }
 }
 
 function updateSipFundSelect() {
@@ -6519,8 +6513,6 @@ async function renderHomeScreen() {
   const el = document.getElementById('homeScreen');
   if (!el) return;
 
-  const wlItems = Object.values(watchlist).sort((a,b) => b.addedAt - a.addedAt);
-
   el.innerHTML = `
     <div style="
       display: flex;
@@ -6563,40 +6555,11 @@ async function renderHomeScreen() {
         "></div>
       </div>
 
-      <!-- Watchlist pills (if any) -->
-      ${wlItems.length ? `
-      <div style="margin-top:40px;width:100%;max-width:580px;">
-        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;margin-bottom:12px;text-align:center;">YOUR WATCHLIST</div>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          ${wlItems.map(f => `
-            <div onclick="loadFund('${f.schemeCode}',\`${f.schemeName.replace(/`/g,"'")}\`)"
-              style="
-                display:flex;align-items:center;gap:12px;
-                background:var(--surface);border:1px solid var(--border);border-radius:12px;
-                padding:12px 16px;cursor:pointer;transition:all 0.15s;
-              "
-              onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--surface2)'"
-              onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'"
-            >
-              <div style="
-                width:30px;height:30px;border-radius:6px;flex-shrink:0;
-                background:var(--surface3);
-                display:flex;align-items:center;justify-content:center;
-                font-size:12px;font-weight:700;color:var(--accent);font-family:var(--mono);
-              ">${f.schemeName.charAt(0)}</div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.schemeName}</div>
-              </div>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-      ` : `
+      <!-- Tagline -->
       <div style="margin-top:20px;font-size:11px;color:var(--text3);font-family:var(--mono);">
         type to search · results appear instantly
       </div>
-      `}
+
     </div>`;
 
   // Auto-focus search
@@ -7042,6 +7005,26 @@ ${rolling.length ? `
 
 <div class="watermark">Generated via VED Investment · MF Research Tool · ${today}</div>
 
+
+<!-- WATCHLIST FUND DETAIL MODAL -->
+<div id="wlDetailModal" onclick="if(event.target===this)wlCloseDetail()"
+  style="display:none;position:fixed;inset:0;background:rgba(4,6,14,0.88);z-index:900;
+    overflow-y:auto;padding:24px 16px;justify-content:center;align-items:flex-start;">
+  <div style="width:100%;max-width:900px;background:var(--surface2);border:1px solid var(--border2);border-radius:16px;overflow:hidden;">
+    <div style="padding:18px 22px;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:flex-start;background:var(--surface3);">
+      <div style="flex:1;min-width:0;padding-right:16px;">
+        <div id="wlDetailFundName" style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text);line-height:1.5;"></div>
+        <div id="wlDetailBenchName" style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-top:4px;"></div>
+      </div>
+      <button onclick="wlCloseDetail()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:0;flex-shrink:0;">&#x2715;</button>
+    </div>
+    <div style="padding:12px 22px;border-bottom:1px solid var(--border2);display:flex;gap:8px;background:var(--surface2);">
+      <button id="wldt-lump" class="swp-mode-btn active-mode" onclick="wlToggleMode('lump')">Lump Sum</button>
+      <button id="wldt-sip"  class="swp-mode-btn"             onclick="wlToggleMode('sip')">SIP (XIRR)</button>
+    </div>
+    <div id="wlDetailBody" style="padding:20px 22px;"></div>
+  </div>
+</div>
 </body>
 </html>`;
 
@@ -8517,7 +8500,10 @@ async function loadWatchlistMonitor() {
       const asOf = f1d ? fmtDate(f1d.date) : '—';
       const rowBg = (i%2===0) ? '' : 'background:#0b0e16;';
 
-      return `<tr style="${rowBg}">
+      const escN = f.schemeName.replace(/`/g,"'");
+      const escB = (f.benchName||'').replace(/`/g,"'");
+      return `<tr style="${rowBg}cursor:pointer;"
+        onclick="wlOpenFundDetail('${f.schemeCode}',\`${escN}\`,'${f.benchCode||''}',\`${escB}\`)">
         <td style="${tdS}text-align:left;color:var(--text3);">${i+1}</td>
         <td style="${tdS}text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis;">
           <div style="font-size:11px;color:var(--text);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.schemeName}">${f.schemeName}</div>
@@ -8530,8 +8516,7 @@ async function loadWatchlistMonitor() {
         <td style="${tdS}font-weight:700;color:${alphaColor};">${alphaStr}</td>
         <td style="${tdS}color:var(--text3);font-size:10px;">${asOf}</td>
         <td style="${tdS}">
-          <button onmousedown="removeFromWatchlist('${f.schemeCode}',null)"
-            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 6px;"
+          <button onmousedown="event.stopPropagation();removeFromWatchlist(\'${f.schemeCode}\',event)            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 6px;"
             title="Remove">✕</button>
         </td>
       </tr>`;
@@ -8673,6 +8658,214 @@ function isinRenderResult(m) {
   </div>`;
 }
 
+// ── WATCHLIST FUND DETAIL MODAL ───────────────────────────────────────────────
+
+let _wlDetailChart = null;
+let _wlDetailData  = null;
+let _wlDetailMode  = 'lump';
+
+window.wlCloseDetail = function() {
+  document.getElementById('wlDetailModal').style.display = 'none';
+  if (_wlDetailChart) { _wlDetailChart.destroy(); _wlDetailChart = null; }
+};
+
+window.wlToggleMode = function(mode) {
+  _wlDetailMode = mode;
+  document.getElementById('wldt-lump').classList.toggle('active-mode', mode === 'lump');
+  document.getElementById('wldt-sip').classList.toggle('active-mode',  mode === 'sip');
+  if (_wlDetailData) { wlRenderDetailChart(_wlDetailData); wlRenderDetailTable(_wlDetailData); }
+};
+
+function navOnOrAfterWL(navArr, date) {
+  const t = date.getTime();
+  for (let i = 0; i < navArr.length; i++) if (navArr[i].date.getTime() >= t) return navArr[i];
+  return null;
+}
+function navOnOrBeforeWL(navArr, date) {
+  const t = date.getTime();
+  for (let i = navArr.length-1; i >= 0; i--) if (navArr[i].date.getTime() <= t) return navArr[i];
+  return null;
+}
+
+function wlCalcLump(navArr, start, end) {
+  const sn = navOnOrAfterWL(navArr, start);
+  const en = navOnOrBeforeWL(navArr, end);
+  if (!sn || !en || en.date <= sn.date) return null;
+  const years = (en.date - sn.date) / (365.25*24*3600*1000);
+  const ratio = en.nav / sn.nav;
+  return years >= 1
+    ? { pct: (Math.pow(ratio, 1/years) - 1)*100, type: 'CAGR' }
+    : { pct: (ratio - 1)*100, type: 'Abs' };
+}
+
+function wlCalcSIP(navArr, start, end) {
+  try {
+    const cfs = buildSIPCashflows(navArr, start, end, 10000, 'monthly');
+    if (cfs.length < 3) return null;
+    const x = calcXIRR(cfs);
+    // calcXIRR already returns % (e.g. 15.3 for 15.3%) — no ×100 needed
+    if (!isFinite(x) || isNaN(x) || x < -99 || x > 500) return null;
+    return { pct: x, type: 'XIRR' };
+  } catch(e) { return null; }
+}
+
+function wlGetPeriods(anchor) {
+  const fy = anchor.getMonth() >= 3 ? anchor.getFullYear() : anchor.getFullYear() - 1;
+  const cap = d => d > anchor ? anchor : d;
+  const q = (ms, me) => ({ start: new Date(ms), end: new Date(ms) <= anchor ? cap(new Date(me)) : null });
+
+  return [
+    { label:'MTD',  start: new Date(anchor.getFullYear(), anchor.getMonth(), 1), end: anchor },
+    { label:'Q1',   ...q(new Date(fy,3,1),   new Date(fy,5,30))   },
+    { label:'Q2',   ...q(new Date(fy,6,1),   new Date(fy,8,30))   },
+    { label:'Q3',   ...q(new Date(fy,9,1),   new Date(fy,11,31))  },
+    { label:'Q4',   ...q(new Date(fy+1,0,1), new Date(fy+1,2,31)) },
+    { label:'YTD',  start: new Date(anchor.getFullYear(),0,1), end: anchor },
+    { label:'FYTD', start: new Date(fy,3,1),              end: anchor },
+    { label:'3M',   start: safeMonthSub(anchor,3),        end: anchor },
+    { label:'6M',   start: safeMonthSub(anchor,6),        end: anchor },
+    { label:'1Y',   start: safeMonthSub(anchor,12),       end: anchor },
+    { label:'2Y',   start: safeMonthSub(anchor,24),       end: anchor },
+    { label:'3Y',   start: safeMonthSub(anchor,36),       end: anchor },
+    { label:'4Y',   start: safeMonthSub(anchor,48),       end: anchor },
+    { label:'5Y',   start: safeMonthSub(anchor,60),       end: anchor },
+  ].filter(p => p.end); // drop quarters not yet started
+}
+
+window.wlOpenFundDetail = async function(code, name, benchCode, benchName) {
+  const modal = document.getElementById('wlDetailModal');
+  modal.style.display = 'flex';
+  document.getElementById('wlDetailFundName').textContent = name;
+  document.getElementById('wlDetailBenchName').textContent = benchCode
+    ? `vs ${benchName}` : '(no benchmark — alpha not available)';
+  document.getElementById('wlDetailBody').innerHTML =
+    `<div class="loading-wrap" style="padding:60px 20px;"><div class="spinner"></div><span>Computing returns…</span></div>`;
+  if (_wlDetailChart) { _wlDetailChart.destroy(); _wlDetailChart = null; }
+
+  try {
+    const toNav = async c => {
+      const d = await getNav(c);
+      return d.data.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) }))
+        .filter(n => !isNaN(n.nav)).reverse();
+    };
+    const fNav = await toNav(code);
+    const bNav = benchCode ? await toNav(benchCode) : null;
+    const anchor = fNav[fNav.length-1].date;
+    const periods = wlGetPeriods(anchor);
+
+    const labels=[], fLump=[], fSIP=[], bLump=[], bSIP=[];
+    for (const p of periods) {
+      labels.push(p.label);
+      fLump.push(wlCalcLump(fNav, p.start, p.end));
+      fSIP.push(wlCalcSIP(fNav, p.start, p.end));
+      bLump.push(bNav ? wlCalcLump(bNav, p.start, p.end) : null);
+      bSIP.push(bNav ? wlCalcSIP(bNav, p.start, p.end)  : null);
+    }
+
+    _wlDetailData = { labels, fLump, fSIP, bLump, bSIP };
+    _wlDetailMode = 'lump';
+    document.getElementById('wldt-lump').classList.add('active-mode');
+    document.getElementById('wldt-sip').classList.remove('active-mode');
+
+    document.getElementById('wlDetailBody').innerHTML =
+      `<div style="position:relative;height:320px;margin-bottom:4px;"><canvas id="wlDetailChart"></canvas></div>
+       <div id="wlDetailTableWrap"></div>`;
+
+    requestAnimationFrame(() => {
+      wlRenderDetailChart(_wlDetailData);
+      wlRenderDetailTable(_wlDetailData);
+    });
+  } catch(e) {
+    document.getElementById('wlDetailBody').innerHTML =
+      `<div style="color:var(--negative);font-family:var(--mono);padding:24px;">Error: ${e.message}</div>`;
+  }
+};
+
+function wlRenderDetailChart(d) {
+  const canvas = document.getElementById('wlDetailChart');
+  if (!canvas) return;
+  if (_wlDetailChart) { _wlDetailChart.destroy(); _wlDetailChart = null; }
+  const mode = _wlDetailMode;
+  const fVals = (mode==='sip' ? d.fSIP  : d.fLump).map(r => r ? +r.pct.toFixed(2) : null);
+  const bVals = (mode==='sip' ? d.bSIP  : d.bLump).map(r => r ? +r.pct.toFixed(2) : null);
+  _wlDetailChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: d.labels,
+      datasets: [
+        { label:'Fund',      data: fVals, backgroundColor: fVals.map(v => v==null?'transparent':v>=0?'#e8aa2e':'#f05c78'), borderRadius:3 },
+        { label:'Benchmark', data: bVals, backgroundColor: bVals.map(v => v==null?'transparent':v>=0?'#6ab0f5':'#f05c7877'), borderRadius:3 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      scales:{
+        x:{ ticks:{ color:'#6b7280', font:{family:'IBM Plex Mono',size:9} }, grid:{ color:'rgba(255,255,255,0.03)' } },
+        y:{ ticks:{ color:'#6b7280', font:{family:'IBM Plex Mono',size:9}, callback: v => v.toFixed(1)+'%' }, grid:{ color:'rgba(255,255,255,0.05)' } }
+      },
+      plugins:{
+        legend:{ labels:{ color:'#9aa5b4', font:{family:'IBM Plex Mono',size:10}, boxWidth:14 } },
+        tooltip:{
+          backgroundColor:'#0d1117', borderColor:'#2a2f3a', borderWidth:1,
+          callbacks:{
+            label: ctx => ctx.raw==null ? ` ${ctx.dataset.label}: N/A` : ` ${ctx.dataset.label}: ${ctx.raw>0?'+':''}${ctx.raw.toFixed(2)}%`,
+            afterBody: items => {
+              const fv = items.find(i=>i.dataset.label==='Fund')?.raw;
+              const bv = items.find(i=>i.dataset.label==='Benchmark')?.raw;
+              if (fv!=null && bv!=null) { const a=fv-bv; return [`Alpha: ${a>0?'+':''}${a.toFixed(2)}%`]; }
+              return [];
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function wlRenderDetailTable(d) {
+  const wrap = document.getElementById('wlDetailTableWrap');
+  if (!wrap) return;
+  const mode = _wlDetailMode;
+  const fV = mode==='sip' ? d.fSIP  : d.fLump;
+  const bV = mode==='sip' ? d.bSIP  : d.bLump;
+  const thS = 'padding:7px 10px;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border2);background:var(--surface3);text-align:right;';
+  const tdS = 'padding:7px 10px;font-family:var(--mono);font-size:11px;border-bottom:1px solid #1a1f2a;text-align:right;';
+  const rows = d.labels.map((lbl,i) => {
+    const f = fV[i], b = bV[i];
+    const fc = f ? (f.pct>0?'#2dd4a0':'#f05c78') : 'var(--text3)';
+    const bc = b ? (b.pct>0?'#2dd4a0':'#f05c78') : 'var(--text3)';
+    const fs = f ? `${f.pct>0?'+':''}${f.pct.toFixed(2)}%` : '—';
+    const bs = b ? `${b.pct>0?'+':''}${b.pct.toFixed(2)}%` : '—';
+    let as2='—', ac='var(--text3)';
+    if (f&&b){ const a=f.pct-b.pct; as2=`${a>0?'+':''}${a.toFixed(2)}%`; ac=a>0?'#2dd4a0':'#f05c78'; }
+    const bg = i%2===0?'':'background:#0b0e16;';
+    return `<tr style="${bg}">
+      <td style="${tdS}text-align:left;color:var(--text2);font-weight:600;">${lbl}</td>
+      <td style="${tdS}font-size:9px;color:var(--text3);">${f?f.type:''}</td>
+      <td style="${tdS}color:${fc};font-weight:600;">${fs}</td>
+      <td style="${tdS}color:${bc};">${bs}</td>
+      <td style="${tdS}color:${ac};font-weight:600;">${as2}</td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `
+  <div style="overflow-x:auto;border-top:1px solid var(--border2);">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="${thS}text-align:left;">Period</th>
+        <th style="${thS}">Type</th>
+        <th style="${thS}">Fund</th>
+        <th style="${thS}">Benchmark</th>
+        <th style="${thS}">Alpha</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="padding:8px 14px;font-family:var(--mono);font-size:9px;color:var(--text3);">
+      Lump Sum: Abs for &lt;1Y · CAGR for ≥1Y &nbsp;|&nbsp; SIP: monthly XIRR &nbsp;|&nbsp; N/A = insufficient NAV data
+    </div>
+  </div>`;
+}
+
 // ══════════════════════════════════════════════════════
 // CHANGELOG
 // ══════════════════════════════════════════════════════
@@ -8799,5 +8992,25 @@ window.openChangelog = function() {
   document.body.appendChild(modal);
 };
 </script>
+
+<!-- WATCHLIST FUND DETAIL MODAL -->
+<div id="wlDetailModal" onclick="if(event.target===this)wlCloseDetail()"
+  style="display:none;position:fixed;inset:0;background:rgba(4,6,14,0.88);z-index:900;
+    overflow-y:auto;padding:24px 16px;justify-content:center;align-items:flex-start;">
+  <div style="width:100%;max-width:900px;background:var(--surface2);border:1px solid var(--border2);border-radius:16px;overflow:hidden;">
+    <div style="padding:18px 22px;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:flex-start;background:var(--surface3);">
+      <div style="flex:1;min-width:0;padding-right:16px;">
+        <div id="wlDetailFundName" style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text);line-height:1.5;"></div>
+        <div id="wlDetailBenchName" style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-top:4px;"></div>
+      </div>
+      <button onclick="wlCloseDetail()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:0;flex-shrink:0;">&#x2715;</button>
+    </div>
+    <div style="padding:12px 22px;border-bottom:1px solid var(--border2);display:flex;gap:8px;background:var(--surface2);">
+      <button id="wldt-lump" class="swp-mode-btn active-mode" onclick="wlToggleMode('lump')">Lump Sum</button>
+      <button id="wldt-sip"  class="swp-mode-btn"             onclick="wlToggleMode('sip')">SIP (XIRR)</button>
+    </div>
+    <div id="wlDetailBody" style="padding:20px 22px;"></div>
+  </div>
+</div>
 </body>
 </html>
