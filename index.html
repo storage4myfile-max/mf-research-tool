@@ -7012,13 +7012,21 @@ ${rolling.length ? `
     overflow-y:auto;padding:24px 16px;justify-content:center;align-items:flex-start;">
   <div style="width:100%;max-width:900px;background:var(--surface2);border:1px solid var(--border2);border-radius:16px;overflow:hidden;">
     <div style="padding:18px 22px;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:flex-start;background:var(--surface3);">
-      <div style="flex:1;min-width:0;padding-right:16px;">
+      <div style="flex:1;min-width:0;padding-right:12px;">
         <div id="wlDetailFundName" style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text);line-height:1.5;"></div>
         <div id="wlDetailBenchName" style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-top:4px;"></div>
       </div>
-      <button onclick="wlCloseDetail()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:0;flex-shrink:0;">&#x2715;</button>
+      <div style="display:flex;gap:10px;align-items:center;flex-shrink:0;">
+        <button onclick="wlDownloadChart()"
+          style="background:transparent;border:1.5px solid #e8aa2e;color:#e8aa2e;
+            font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:0.5px;
+            padding:6px 14px;border-radius:6px;cursor:pointer;white-space:nowrap;">
+          &#8595; PNG
+        </button>
+        <button onclick="wlCloseDetail()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:0;">&#x2715;</button>
+      </div>
     </div>
-    <div style="padding:12px 22px;border-bottom:1px solid var(--border2);display:flex;gap:8px;background:var(--surface2);">
+    <div style="padding:12px 22px;border-bottom:1px solid var(--border2);display:flex;gap:8px;align-items:center;background:var(--surface2);">
       <button id="wldt-lump" class="swp-mode-btn active-mode" onclick="wlToggleMode('lump')">Lump Sum</button>
       <button id="wldt-sip"  class="swp-mode-btn"             onclick="wlToggleMode('sip')">SIP (XIRR)</button>
     </div>
@@ -8701,7 +8709,7 @@ function wlCalcLump(navArr, start, end) {
 function wlCalcSIP(navArr, start, end) {
   try {
     const cfs = buildSIPCashflows(navArr, start, end, 10000, 'monthly');
-    if (cfs.length < 3) return null;
+    if (cfs.length < 2) return null;
     const x = calcXIRR(cfs);
     // calcXIRR already returns % (e.g. 15.3 for 15.3%) — no ×100 needed
     if (!isFinite(x) || isNaN(x) || x < -99 || x > 500) return null;
@@ -8866,6 +8874,99 @@ function wlRenderDetailTable(d) {
   </div>`;
 }
 
+window.wlDownloadChart = async function() {
+  const chartCanvas = document.getElementById('wlDetailChart');
+  const data = _wlDetailData;
+  if (!chartCanvas || !data) { showToast('No chart to export', 'error'); return; }
+
+  const fundName  = document.getElementById('wlDetailFundName').textContent;
+  const benchLine = document.getElementById('wlDetailBenchName').textContent;
+  const mode      = _wlDetailMode === 'sip' ? 'SIP — XIRR' : 'Lump Sum';
+  const dateStr   = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const chartImg  = chartCanvas.toDataURL('image/png');
+
+  const fV = _wlDetailMode === 'sip' ? data.fSIP : data.fLump;
+  const bV = _wlDetailMode === 'sip' ? data.bSIP : data.bLump;
+
+  const thS = 'padding:7px 10px;font-family:"IBM Plex Mono",monospace;font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;';
+  const tdS = 'padding:6px 10px;font-family:"IBM Plex Mono",monospace;font-size:11px;border-bottom:1px solid #1e2430;';
+
+  const tableRows = data.labels.map((lbl,i) => {
+    const f=fV[i], b=bV[i];
+    const fc = f?(f.pct>0?'#2dd4a0':'#f05c78'):'#555';
+    const bc = b?(b.pct>0?'#2dd4a0':'#f05c78'):'#555';
+    const fs = f?`${f.pct>0?'+':''}${f.pct.toFixed(2)}%`:'—';
+    const bs = b?`${b.pct>0?'+':''}${b.pct.toFixed(2)}%`:'—';
+    let as2='—', ac='#555';
+    if(f&&b){const a=f.pct-b.pct; as2=`${a>0?'+':''}${a.toFixed(2)}%`; ac=a>0?'#2dd4a0':'#f05c78';}
+    const bg = i%2===0?'#0d1117':'#0f1420';
+    return `<tr style="background:${bg};">
+      <td style="${tdS}color:#c0c8d8;text-align:left;">${lbl}</td>
+      <td style="${tdS}color:#555;text-align:right;font-size:9px;">${f?f.type:''}</td>
+      <td style="${tdS}color:${fc};font-weight:700;text-align:right;">${fs}</td>
+      <td style="${tdS}color:${bc};text-align:right;">${bs}</td>
+      <td style="${tdS}color:${ac};font-weight:700;text-align:right;">${as2}</td>
+    </tr>`;
+  }).join('');
+
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;background:#0d1117;overflow:hidden;border-radius:10px;';
+  el.innerHTML = `
+    <div style="padding:18px 22px;border-bottom:1px solid #2a2f3a;background:#080b12;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#e8e8e8;line-height:1.5;">${fundName}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#e8aa2e;margin-top:4px;">${benchLine}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6b7280;margin-top:2px;">${mode} Returns</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#e8aa2e;">VED Investment</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa5b4;margin-top:2px;">Vivek Vijaykumar Chawla</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa5b4;">ARN-253228 · EUIN E472276</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b7280;margin-top:2px;">${dateStr}</div>
+      </div>
+    </div>
+    <div style="padding:16px 22px 12px;background:#0d1117;">
+      <img src="${chartImg}" style="width:100%;display:block;border-radius:6px;">
+    </div>
+    <div style="padding:0 22px 16px;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:#111520;">
+          <th style="${thS}text-align:left;">Period</th>
+          <th style="${thS}text-align:right;">Type</th>
+          <th style="${thS}color:#e8aa2e;text-align:right;">Fund</th>
+          <th style="${thS}color:#6ab0f5;text-align:right;">Benchmark</th>
+          <th style="${thS}text-align:right;">Alpha</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+    <div style="padding:10px 22px;border-top:1px solid #2a2f3a;background:#080b12;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:#e8aa2e;">VED Investment · Vivek Vijaykumar Chawla · ARN-253228</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#555;">${dateStr}</div>
+    </div>
+    <div style="padding:8px 22px 12px;background:#0a0d14;border-top:1px solid #1e2430;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#777;text-align:center;line-height:1.7;">
+        Mutual fund investments are subject to market risks, read all scheme related documents carefully.<br>
+        Past performance is not indicative of future returns. This mutual fund scheme may or may not be suitable as per your risk appetite.
+      </div>
+    </div>`;
+
+  document.body.appendChild(el);
+  showToast('Capturing…', '');
+  try {
+    const cap = await html2canvas(el, { backgroundColor:'#0d1117', scale:2, useCORS:true, logging:false });
+    const link = document.createElement('a');
+    link.download = `WL-${fundName.substring(0,35).replace(/[^a-zA-Z0-9]/g,'-')}-${new Date().toISOString().slice(0,10)}.png`;
+    link.href = cap.toDataURL('image/png');
+    link.click();
+    showToast('PNG downloaded', 'success');
+  } catch(e) {
+    showToast('Export failed', 'error');
+  } finally {
+    el.remove();
+  }
+};
+
 // ══════════════════════════════════════════════════════
 // CHANGELOG
 // ══════════════════════════════════════════════════════
@@ -9003,9 +9104,17 @@ window.openChangelog = function() {
         <div id="wlDetailFundName" style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text);line-height:1.5;"></div>
         <div id="wlDetailBenchName" style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-top:4px;"></div>
       </div>
-      <button onclick="wlCloseDetail()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:0;flex-shrink:0;">&#x2715;</button>
+      <div style="display:flex;gap:10px;align-items:center;flex-shrink:0;">
+        <button onclick="wlDownloadChart()"
+          style="background:transparent;border:1.5px solid #e8aa2e;color:#e8aa2e;
+            font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;
+            padding:6px 14px;border-radius:6px;cursor:pointer;white-space:nowrap;letter-spacing:0.5px;">
+          &#8595; PNG
+        </button>
+        <button onclick="wlCloseDetail()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:0;">&#x2715;</button>
+      </div>
     </div>
-    <div style="padding:12px 22px;border-bottom:1px solid var(--border2);display:flex;gap:8px;background:var(--surface2);">
+    <div style="padding:12px 22px;border-bottom:1px solid var(--border2);display:flex;gap:8px;align-items:center;background:var(--surface2);">
       <button id="wldt-lump" class="swp-mode-btn active-mode" onclick="wlToggleMode('lump')">Lump Sum</button>
       <button id="wldt-sip"  class="swp-mode-btn"             onclick="wlToggleMode('sip')">SIP (XIRR)</button>
     </div>
