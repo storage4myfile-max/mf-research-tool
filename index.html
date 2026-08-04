@@ -973,6 +973,7 @@
     <div class="nav-tab" onclick="switchPage('fundmgr')">Scorecard</div>
     <div class="nav-tab" onclick="switchPage('catheatmap')">Cat Heatmap</div>
     <div class="nav-tab" onclick="switchPage('isinlookup')">ISIN</div>
+    <div class="nav-tab" onclick="switchPage('navdl')">NAV Data</div>
   </div>
   <div style="display:flex;align-items:center;gap:12px;">
     <div class="sync-status">
@@ -1014,6 +1015,7 @@
       <div class="mobile-nav-item" id="mnav-catscanner" onclick="mobileNav('catscanner')"><span class="mobile-nav-icon">🔍</span>Category Scan</div>
       <div class="mobile-nav-item" id="mnav-catheatmap" onclick="mobileNav('catheatmap')"><span class="mobile-nav-icon">🌡</span>Cat Heatmap</div>
       <div class="mobile-nav-item" id="mnav-isinlookup" onclick="mobileNav('isinlookup')"><span class="mobile-nav-icon">🔎</span>ISIN Lookup</div>
+      <div class="mobile-nav-item" id="mnav-navdl" onclick="mobileNav('navdl')"><span class="mobile-nav-icon">📥</span>NAV Data</div>
       <div class="mobile-nav-item" id="mnav-fundmgr" onclick="mobileNav('fundmgr')"><span class="mobile-nav-icon">📊</span>Scorecard</div>
     </div>
     <div class="mobile-drawer-section">
@@ -1343,6 +1345,125 @@
           <span id="ptpSlotCount" style="font-size:11px; font-family:var(--mono); color:var(--text3);"></span>
         </div>
         <div id="ptpCalcResult" style="margin-top:24px;"></div>
+      </div>
+
+      <!-- ── CATEGORY PTP RANKER ─────────────────────────────────── -->
+      <div style="margin-top:28px;">
+        <div class="section-title" style="margin-bottom:16px;font-size:14px;">Category PTP Ranker</div>
+        <div class="ptp-card">
+
+          <!-- Row 1: Category + Plan + Lump Sum -->
+          <div class="input-row" style="margin-bottom:16px;flex-wrap:wrap;">
+            <div class="input-group">
+              <label class="input-label">Category</label>
+              <select class="input-field" id="cptpr-category" style="width:200px;">
+                <optgroup label="Equity">
+                  <option value="flexi cap">Flexi Cap</option>
+                  <option value="large cap">Large Cap</option>
+                  <option value="mid cap">Mid Cap</option>
+                  <option value="small cap">Small Cap</option>
+                  <option value="multi cap">Multi Cap</option>
+                  <option value="large & mid">Large &amp; Mid Cap</option>
+                  <option value="elss">ELSS</option>
+                  <option value="focused">Focused</option>
+                  <option value="value fund">Value Fund</option>
+                  <option value="contra">Contra</option>
+                  <option value="dividend yield">Dividend Yield</option>
+                  <option value="sectoral">Sectoral / Thematic</option>
+                </optgroup>
+                <optgroup label="Debt">
+                  <option value="liquid">Liquid</option>
+                  <option value="overnight">Overnight</option>
+                  <option value="ultra short">Ultra Short Duration</option>
+                  <option value="low duration">Low Duration</option>
+                  <option value="short duration">Short Duration</option>
+                  <option value="medium duration">Medium Duration</option>
+                  <option value="long duration">Long Duration</option>
+                  <option value="corporate bond">Corporate Bond</option>
+                  <option value="credit risk">Credit Risk</option>
+                  <option value="gilt">Gilt</option>
+                  <option value="dynamic bond">Dynamic Bond</option>
+                  <option value="banking and psu">Banking &amp; PSU</option>
+                </optgroup>
+                <optgroup label="Hybrid">
+                  <option value="aggressive">Aggressive Hybrid</option>
+                  <option value="balanced">Balanced Advantage / BAF</option>
+                  <option value="multi asset">Multi Asset Allocation</option>
+                  <option value="arbitrage">Arbitrage</option>
+                  <option value="income plus arbitrage">Income Plus Arbitrage</option>
+                  <option value="equity savings">Equity Savings</option>
+                </optgroup>
+                <optgroup label="Index / ETF">
+                  <option value="nifty 50">Nifty 50 Index</option>
+                  <option value="nifty 500">Nifty 500 Index</option>
+                  <option value="nifty next 50">Nifty Next 50 Index</option>
+                  <option value="midcap 150">Nifty Midcap 150 Index</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Plan Type</label>
+              <select class="input-field" id="cptpr-plan" style="width:140px;">
+                <option value="direct_growth">Direct Growth</option>
+                <option value="regular_growth">Regular Growth</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Lump Sum (₹)</label>
+              <input class="input-field" type="number" id="cptpr-amt" value="100000" style="width:130px;">
+            </div>
+          </div>
+
+          <!-- Row 2: Period pills -->
+          <div style="margin-bottom:14px;">
+            <label class="input-label" style="margin-bottom:8px;display:block;">Period</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;" id="cptprPeriodPills">
+              ${['1M','3M','6M','1Y','2Y','3Y','5Y','10Y'].map((p,i) =>
+                `<button class="bench-pill${p==='1Y'?' active':''}" id="cptpr-pp-${i}" onclick="cptprSelectPeriod('${p}',${i})">${p}</button>`
+              ).join('')}
+            </div>
+          </div>
+
+          <!-- Row 3: As On Date + Custom override -->
+          <div class="input-row" style="margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
+            <div class="input-group">
+              <label class="input-label" style="color:var(--accent);">As On Date <span style="color:var(--text3);font-size:9px;">(blank = latest NAV)</span></label>
+              <input class="input-field" type="date" id="cptpr-as-on" style="width:155px;border-color:rgba(232,170,46,0.35);">
+            </div>
+            <div class="input-group" style="align-self:flex-end;">
+              <button class="btn btn-secondary" onclick="document.getElementById('cptpr-as-on').value=''" style="height:34px;">✕ Clear</button>
+            </div>
+            <div style="width:1px;height:34px;background:var(--border2);margin:0 4px;align-self:flex-end;"></div>
+            <div class="input-group">
+              <label class="input-label">Custom Start <span style="font-size:9px;color:var(--text3);">(overrides period)</span></label>
+              <input class="input-field" type="date" id="cptpr-start" style="width:155px;">
+            </div>
+            <div class="input-group">
+              <label class="input-label">Custom End</label>
+              <input class="input-field" type="date" id="cptpr-end" style="width:155px;">
+            </div>
+            <div class="input-group" style="align-self:flex-end;">
+              <button class="btn btn-secondary" onclick="document.getElementById('cptpr-start').value='';document.getElementById('cptpr-end').value='';" style="height:34px;">✕ Clear</button>
+            </div>
+          </div>
+
+          <!-- Row 4: Benchmark pills -->
+          <div style="margin-bottom:16px;">
+            <label class="input-label" style="margin-bottom:8px;display:block;">Benchmark for Alpha</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;" id="cptprBenchPillsWrap"></div>
+            <div id="cptprBenchLabel" style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:5px;">none selected</div>
+          </div>
+
+          <!-- Run button -->
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="runCPTPR()">&#9654; Run Ranker</button>
+            <div id="cptprStatus" style="font-family:var(--mono);font-size:11px;color:var(--text3);"></div>
+          </div>
+
+          <!-- Results -->
+          <div id="cptprResult" style="margin-top:20px;"></div>
+
+        </div>
       </div>
     </div>
 
@@ -1892,6 +2013,46 @@
 
         <!-- Result card -->
         <div id="isinResult"></div>
+
+      </div>
+    </div>
+
+    <!-- NAV DATA DOWNLOADER PAGE -->
+    <div class="page" id="page-navdl">
+      <div class="section-title" style="margin-bottom:16px;">Historical NAV Downloader</div>
+      <div class="ptp-card">
+
+        <!-- Date filter -->
+        <div class="swp-refill-box" style="margin-bottom:18px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">Date Filter <span style="color:var(--text3);">(leave blank for full history)</span></div>
+          <div class="input-row" style="margin-bottom:0;flex-wrap:wrap;">
+            <div class="input-group">
+              <label class="input-label">From</label>
+              <input class="input-field" type="date" id="navdl-from" style="width:160px;">
+            </div>
+            <div class="input-group">
+              <label class="input-label">To</label>
+              <input class="input-field" type="date" id="navdl-to" style="width:160px;">
+            </div>
+            <div class="input-group" style="align-self:flex-end;">
+              <button class="btn btn-secondary" onclick="navDlClearDates()" style="height:34px;">✕ Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fund slots -->
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Funds</div>
+        <div id="navDlSlots"></div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+          <button class="btn btn-secondary" onclick="navDlAddFund()" id="navDlAddBtn">+ Add Fund</button>
+          <button class="btn-export csv" onclick="navDlDownloadAll('csv')" style="padding:7px 14px;">⬇ All CSV</button>
+          <button class="btn-export xl"  onclick="navDlDownloadAll('xlsx')" style="padding:7px 14px;">⬇ All Excel</button>
+        </div>
+
+        <!-- Status -->
+        <div id="navDlStatus" style="margin-top:16px;"></div>
 
       </div>
     </div>
@@ -4406,7 +4567,7 @@ window.calcRollingMulti = async function() {
 window.switchPage = function(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${page}`)?.classList.add('active');
-  const pages = ['fund','compare','sipcalc','ptpcalc','rollingcalc','stepupcalc','swpcalc','chartcmp','catscanner','lumpsip','goalcalc','corrmatrix','fundmgr','catheatmap','isinlookup'];
+  const pages = ['fund','compare','sipcalc','ptpcalc','rollingcalc','stepupcalc','swpcalc','chartcmp','catscanner','lumpsip','goalcalc','corrmatrix','fundmgr','catheatmap','isinlookup','navdl'];
   document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', pages[i] === page));
   updateBottomNav(page);
   updateDrawerNav(page);
@@ -8965,6 +9126,622 @@ window.wlDownloadChart = async function() {
   } finally {
     el.remove();
   }
+};
+
+// ── HISTORICAL NAV DOWNLOADER ─────────────────────────────────────────────────
+
+let _navDlFunds  = [{ id:0, code:'', name:'' }];
+let _navDlNextId = 1;
+const _navDlCache  = {};
+const _navDlTimers = {};
+
+window.navDlAddFund = function() {
+  if (_navDlFunds.length >= 10) { showToast('Maximum 10 funds', 'error'); return; }
+  _navDlFunds.push({ id: _navDlNextId++, code:'', name:'' });
+  navDlRender();
+};
+
+window.navDlRemoveFund = function(id) {
+  if (_navDlFunds.length <= 1) { showToast('Need at least 1 fund', 'error'); return; }
+  _navDlFunds = _navDlFunds.filter(f => f.id !== id);
+  navDlRender();
+};
+
+window.navDlClearDates = function() {
+  const f = document.getElementById('navdl-from');
+  const t = document.getElementById('navdl-to');
+  if (f) f.value = '';
+  if (t) t.value = '';
+};
+
+function navDlRender() {
+  const c = document.getElementById('navDlSlots');
+  if (!c) return;
+  c.innerHTML = _navDlFunds.map(f => `
+    <div class="swp-bucket-card" id="navdl-slot-${f.id}" style="margin-bottom:10px;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;position:relative;">
+          <input class="input-field" id="navdl-input-${f.id}" type="text"
+            placeholder="Search fund name…"
+            value="${(f.name||'').substring(0,60).replace(/"/g,"'")}"
+            autocomplete="off" oninput="navDlOnInput(${f.id},this.value)" style="width:100%;">
+          <div id="navdl-res-${f.id}" style="display:none;position:absolute;top:calc(100%+4px);left:0;right:0;
+            background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+            max-height:220px;overflow-y:auto;z-index:400;box-shadow:0 8px 32px rgba(0,0,0,.5);"></div>
+          <div id="navdl-meta-${f.id}" style="font-size:9px;font-family:var(--mono);margin-top:3px;
+            color:${f.code?'#2dd4a0':'var(--text3)'};">${f.code?'✓ '+f.code:'not selected'}</div>
+        </div>
+        <button class="btn-export csv" onclick="navDlDownload(${f.id},'csv')" style="white-space:nowrap;padding:6px 12px;">⬇ CSV</button>
+        <button class="btn-export xl"  onclick="navDlDownload(${f.id},'xlsx')" style="white-space:nowrap;padding:6px 12px;">⬇ Excel</button>
+        ${_navDlFunds.length > 1
+          ? `<button class="btn btn-secondary" onclick="navDlRemoveFund(${f.id})"
+               style="padding:4px 10px;font-size:10px;color:var(--danger);border-color:var(--danger);">✕</button>`
+          : ''}
+      </div>
+    </div>`).join('');
+
+  const addBtn = document.getElementById('navDlAddBtn');
+  if (addBtn) addBtn.style.opacity = _navDlFunds.length >= 10 ? '0.4' : '1';
+
+  // close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', e => {
+      _navDlFunds.forEach(f => {
+        if (!e.target.closest(`#navdl-slot-${f.id}`)) {
+          const r = document.getElementById(`navdl-res-${f.id}`);
+          if (r) r.style.display = 'none';
+        }
+      });
+    }, { once: true });
+  }, 0);
+}
+
+window.navDlOnInput = function(id, val) {
+  const f = _navDlFunds.find(x => x.id === id);
+  if (f) { f.code = ''; f.name = val; }
+  const res  = document.getElementById(`navdl-res-${id}`);
+  const meta = document.getElementById(`navdl-meta-${id}`);
+  if (!res) return;
+  clearTimeout(_navDlTimers[id]);
+  if (meta) { meta.textContent = 'not selected'; meta.style.color = 'var(--text3)'; }
+  if (val.trim().length < 2) { res.style.display = 'none'; return; }
+  _navDlTimers[id] = setTimeout(async () => {
+    const results = await searchFunds(val.trim());
+    if (!results.length) { res.style.display = 'none'; return; }
+    res.innerHTML = results.map(r => `
+      <div class="search-result-item" onmousedown="navDlSelect(${id},'${r.schemeCode}',\`${r.schemeName.replace(/`/g,"'")}\`)">
+        <div class="result-name">${r.schemeName}</div>
+        <div class="result-meta">${r.schemeCode}</div>
+      </div>`).join('');
+    res.style.display = 'block';
+  }, 300);
+};
+
+window.navDlSelect = function(id, code, name) {
+  const f = _navDlFunds.find(x => x.id === id);
+  if (!f) return;
+  f.code = code; f.name = name;
+  navDlRender();
+};
+
+function navDlGetDates() {
+  const fv = document.getElementById('navdl-from')?.value;
+  const tv = document.getElementById('navdl-to')?.value;
+  return {
+    from: fv ? new Date(fv) : null,
+    to:   tv ? new Date(tv) : null,
+  };
+}
+
+async function navDlFetchNav(fund) {
+  if (_navDlCache[fund.code]) return _navDlCache[fund.code];
+  const d = await getNav(fund.code);
+  const arr = d.data
+    .map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) }))
+    .filter(n => !isNaN(n.nav))
+    .reverse();               // oldest → newest
+  _navDlCache[fund.code] = arr;
+  return arr;
+}
+
+function navDlApplyFilter(arr, from, to) {
+  return arr.filter(n =>
+    (!from || n.date >= from) &&
+    (!to   || n.date <= to)
+  );
+}
+
+function navDlFmtDate(d) {
+  return d.toLocaleDateString('en-IN', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+function navDlSafeName(name, code) {
+  return `${name.substring(0,40).replace(/[^a-zA-Z0-9]/g,'-')}_${code}`;
+}
+
+window.navDlDownload = async function(id, fmt) {
+  const fund = _navDlFunds.find(f => f.id === id);
+  if (!fund?.code) { showToast('Select a fund first', 'error'); return; }
+
+  const statusEl = document.getElementById('navDlStatus');
+  if (statusEl) statusEl.innerHTML = `<div class="loading-wrap" style="padding:14px;">
+    <div class="spinner"></div><span>Fetching NAV data…</span></div>`;
+
+  try {
+    const { from, to } = navDlGetDates();
+    const navArr   = await navDlFetchNav(fund);
+    const filtered = navDlApplyFilter(navArr, from, to);
+
+    if (!filtered.length) { showToast('No data in selected date range', 'error'); return; }
+
+    const safeName = navDlSafeName(fund.name, fund.code);
+    const d0 = navDlFmtDate(filtered[0].date);
+    const d1 = navDlFmtDate(filtered[filtered.length-1].date);
+
+    if (fmt === 'csv') {
+      const lines = [
+        `Fund Name,${fund.name}`,
+        `AMFI Code,${fund.code}`,
+        `Records,${filtered.length}`,
+        `Date Range,${d0} to ${d1}`,
+        '',
+        'Date,NAV',
+        ...filtered.map(n => `${navDlFmtDate(n.date)},${n.nav}`)
+      ];
+      const a = document.createElement('a');
+      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines.join('\n'));
+      a.download = `${safeName}-NAV.csv`;
+      a.click();
+
+    } else {
+      const rows = [
+        ['Fund Name', fund.name],
+        ['AMFI Code', String(fund.code)],
+        ['Records',   filtered.length],
+        ['Date Range', `${d0} to ${d1}`],
+        [],
+        ['Date', 'NAV'],
+        ...filtered.map(n => [navDlFmtDate(n.date), n.nav])
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{ wch: 14 }, { wch: 14 }];
+      // Bold header row (row 6, index 5)
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'NAV History');
+      XLSX.writeFile(wb, `${safeName}-NAV.xlsx`);
+    }
+
+    if (statusEl) statusEl.innerHTML = `
+      <div style="padding:10px 16px;background:var(--surface3);border:1px solid var(--border2);
+        border-radius:8px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+        <div style="font-family:var(--mono);font-size:10px;color:#2dd4a0;font-weight:700;">✓ Downloaded</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text);flex:1;min-width:0;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${fund.name}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);white-space:nowrap;">
+          ${filtered.length.toLocaleString('en-IN')} records &nbsp;·&nbsp; ${d0} → ${d1}
+        </div>
+      </div>`;
+    showToast(`${fmt.toUpperCase()} — ${filtered.length.toLocaleString('en-IN')} records`, 'success');
+
+  } catch(e) {
+    if (statusEl) statusEl.innerHTML = `<div style="color:var(--negative);font-family:var(--mono);
+      font-size:12px;padding:12px;">Error: ${e.message}</div>`;
+    showToast('Download failed', 'error');
+  }
+};
+
+window.navDlDownloadAll = async function(fmt) {
+  const valid = _navDlFunds.filter(f => f.code);
+  if (!valid.length) { showToast('No funds selected', 'error'); return; }
+  showToast(`Downloading ${valid.length} file${valid.length>1?'s':''}…`, '');
+  for (let i = 0; i < valid.length; i++) {
+    await navDlDownload(valid[i].id, fmt);
+    if (i < valid.length - 1) await new Promise(r => setTimeout(r, 500));
+  }
+};
+
+// Init
+setTimeout(() => navDlRender(), 850);
+
+// ── CATEGORY PTP RANKER ───────────────────────────────────────────────────────
+
+let _cptprPeriod    = '1Y';
+let _cptprBenchCode = '';
+let _cptprBenchName = '';
+let _cptprResults   = null;
+
+// Init bench pills on load
+setTimeout(() => {
+  const wrap = document.getElementById('cptprBenchPillsWrap');
+  if (!wrap) return;
+  wrap.innerHTML = SHARED_BENCH_PILLS.map((p, i) =>
+    `<button class="bench-pill" id="cptpr-bp-${i}" onclick="cptprSelectBench(${i},'${p.code}','${p.label}')">${p.label}</button>`
+  ).join('');
+}, 900);
+
+window.cptprSelectPeriod = function(period, idx) {
+  _cptprPeriod = period;
+  document.querySelectorAll('#cptprPeriodPills .bench-pill').forEach((b, i) =>
+    b.classList.toggle('active', i === idx));
+};
+
+window.cptprSelectBench = function(idx, code, label) {
+  _cptprBenchCode = code;
+  _cptprBenchName = label;
+  document.querySelectorAll('[id^="cptpr-bp-"]').forEach((b, i) =>
+    b.classList.toggle('active', i === idx));
+  const lbl = document.getElementById('cptprBenchLabel');
+  if (lbl) { lbl.textContent = `✓ ${label}`; lbl.style.color = 'var(--accent)'; }
+};
+
+function cptprPeriodMonths(p) {
+  return { '1M':1,'3M':3,'6M':6,'1Y':12,'2Y':24,'3Y':36,'5Y':60,'10Y':120 }[p] || 12;
+}
+
+function cptprCalcReturn(navArr, start, end) {
+  // reuse watchlist lump calc helpers
+  const sn = navOnOrAfterWL(navArr, start);
+  const en = navOnOrBeforeWL(navArr, end);
+  if (!sn || !en || en.date <= sn.date) return null;
+  const years = (en.date - sn.date) / (365.25*24*3600*1000);
+  const ratio = en.nav / sn.nav;
+  return years >= 1
+    ? { pct: (Math.pow(ratio, 1/years) - 1)*100, type:'CAGR', sNav:sn.nav, eNav:en.nav, sDate:sn.date, eDate:en.date }
+    : { pct: (ratio - 1)*100,                     type:'Abs',  sNav:sn.nav, eNav:en.nav, sDate:sn.date, eDate:en.date };
+}
+
+window.runCPTPR = async function() {
+  const resultEl  = document.getElementById('cptprResult');
+  const statusEl  = document.getElementById('cptprStatus');
+  if (!resultEl || !statusEl) return;
+
+  const catVal  = document.getElementById('cptpr-category').value;
+  const plan    = document.getElementById('cptpr-plan').value;
+  const amt     = +document.getElementById('cptpr-amt').value || 100000;
+  const asOnVal = document.getElementById('cptpr-as-on')?.value;
+  const custS   = document.getElementById('cptpr-start')?.value;
+  const custE   = document.getElementById('cptpr-end')?.value;
+
+  // Compute date range
+  let endDate, startDate;
+  const asOnDate = asOnVal ? new Date(asOnVal) : null;
+  if (custS && custE) {
+    startDate = new Date(custS); endDate = new Date(custE);
+  } else if (asOnDate) {
+    endDate   = asOnDate;
+    startDate = safeMonthSub(endDate, cptprPeriodMonths(_cptprPeriod));
+  } else {
+    endDate   = new Date();
+    startDate = safeMonthSub(endDate, cptprPeriodMonths(_cptprPeriod));
+  }
+
+  resultEl.innerHTML = '';
+  statusEl.textContent = 'Loading fund list…';
+
+  // Load all funds (reuse cached allFunds from CSR if available)
+  if (!window.allFunds) {
+    try {
+      const r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf/latest');
+      window.allFunds = await r.json();
+    } catch(e) { showToast('Could not load fund list', 'error'); statusEl.textContent = ''; return; }
+  }
+
+  await _ensureStaleFilter();
+
+  // Filter logic (same as CSR)
+  const CAT_EXCLUDE_L = {
+    'mid cap':['large & mid','large and mid','l&m'],'large cap':['large & mid','large and mid','multi cap','flexi'],
+    'small cap':['large & mid','mid cap','midcap'],'flexi cap':['multi cap'],
+    'value fund':['contra'],'contra':['value fund'],
+    'arbitrage':['income plus','income & arb','income and arb','plus arbitrage','income plus arbitrage'],
+    'income plus arbitrage':[],'sectoral':[],'thematic':[],
+  };
+  const CAT_ALIASES_L = {
+    'mid cap':['mid cap','midcap'],'large cap':['large cap','largecap'],
+    'small cap':['small cap','smallcap'],'flexi cap':['flexi cap','flexicap'],
+    'large & mid':['large & mid','large and mid'],'multi cap':['multi cap','multicap'],
+    'income plus arbitrage':['income plus arbitrage'],
+  };
+  const ALWAYS_EX = ['etf','index',' nifty ',' sensex ','fund of fund',' fof ','feeder',
+    'exchange traded','series 1','series 2','series 3','series 4','series 5','series 6',
+    'series 7','series 8','series 9',' - sr ','close ended','closed ended','idcw',
+    'dividend','payout','bonus option','bonus plan','income distribution',
+    'weekly reinvestment','fortnightly','monthly reinvestment'];
+
+  const excludeTerms = CAT_EXCLUDE_L[catVal] || [];
+  const matchTerms   = CAT_ALIASES_L[catVal]  || [catVal];
+  const alwaysEx     = catVal === 'income plus arbitrage'
+    ? ALWAYS_EX.filter(e => e !== 'fund of fund' && e !== ' fof ' && e !== 'feeder')
+    : ALWAYS_EX;
+
+  let funds = window.allFunds.filter(f => {
+    const n = f.schemeName.toLowerCase();
+    if (!matchTerms.some(m => n.includes(m))) return false;
+    for (const ex of excludeTerms) if (n.includes(ex)) return false;
+    for (const ex of alwaysEx)     if (n.includes(ex)) return false;
+    return true;
+  }).map(f => ({ ...f, planType: detectPlanType(f.schemeName) }))
+    .filter(f => f.planType === plan);
+
+  if (window._staleCodes?.size > 0)
+    funds = funds.filter(f => !window._staleCodes.has(String(f.schemeCode)));
+
+  if (!funds.length) {
+    resultEl.innerHTML = `<div style="color:var(--text3);font-family:var(--mono);padding:16px;">No funds found.</div>`;
+    statusEl.textContent = ''; return;
+  }
+
+  // Benchmark
+  let benchReturn = null;
+  if (_cptprBenchCode) {
+    statusEl.textContent = 'Loading benchmark…';
+    try {
+      const bd = await getNav(_cptprBenchCode);
+      const bNav = bd.data.map(n => ({ date:parseDate(n.date), nav:parseFloat(n.nav) })).filter(n=>!isNaN(n.nav)).reverse();
+      benchReturn = cptprCalcReturn(bNav, startDate, endDate);
+    } catch(e) { benchReturn = null; }
+  }
+
+  // Process funds in parallel batches of 15
+  const results = [];
+  const BATCH = 15;
+  let done = 0;
+  for (let i = 0; i < funds.length; i += BATCH) {
+    const batch = funds.slice(i, i + BATCH);
+    await Promise.allSettled(batch.map(async f => {
+      try {
+        const d    = await getNav(f.schemeCode);
+        const nArr = d.data.map(n => ({ date:parseDate(n.date), nav:parseFloat(n.nav) })).filter(n=>!isNaN(n.nav)).reverse();
+        const ret  = cptprCalcReturn(nArr, startDate, endDate);
+        if (ret) {
+          const alpha = benchReturn ? ret.pct - benchReturn.pct : null;
+          const finalVal = amt * (ret.sNav > 0 ? ret.eNav / ret.sNav : 1);
+          results.push({ name: f.schemeName, code: f.schemeCode, ...ret, alpha, finalVal });
+        }
+      } catch(e) {}
+      done++;
+    }));
+    statusEl.textContent = `Processing ${Math.min(done, funds.length)} / ${funds.length} funds…`;
+  }
+
+  results.sort((a, b) => b.pct - a.pct);
+  _cptprResults = { results, benchReturn, catVal, plan, amt, startDate, endDate, period: _cptprPeriod, benchName: _cptprBenchName };
+  statusEl.textContent = `✓ ${results.length} funds ranked`;
+  cptprRenderResults(_cptprResults);
+};
+
+function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate, endDate, period, benchName }) {
+  const resultEl = document.getElementById('cptprResult');
+  if (!resultEl) return;
+
+  const fmtD  = d => d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const fmtV  = v => Math.abs(v) >= 10000000 ? `₹${(v/10000000).toFixed(2)}Cr` : Math.abs(v) >= 100000 ? `₹${(v/100000).toFixed(2)}L` : `₹${Math.round(v).toLocaleString('en-IN')}`;
+  const planLabel = plan === 'direct_growth' ? 'Direct Growth' : 'Regular Growth';
+  const hasBench  = !!benchReturn;
+
+  // Summary header
+  const catLabel = document.getElementById('cptpr-category').options[document.getElementById('cptpr-category').selectedIndex].text;
+  const header   = `<div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-bottom:12px;">
+    ${catLabel} · ${planLabel} · ${period} PTP · ${fmtD(startDate)} → ${fmtD(endDate)} · ${results.length} funds
+    ${hasBench ? ` · vs <span style="color:var(--text2);">${benchName}</span> (${benchReturn.pct>0?'+':''}${benchReturn.pct.toFixed(2)}% ${benchReturn.type})` : ''}
+  </div>`;
+
+  // Export buttons
+  const exportBar = `<div class="export-bar" style="margin-bottom:12px;">
+    <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
+    <button class="btn-export png" onclick="cptprExportPNG()">&#8595; PNG</button>
+    <button class="btn-export pdf" onclick="cptprExportPDF()">&#8595; PDF</button>
+  </div>`;
+
+  // Table
+  const thS = 'padding:7px 10px;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border2);background:var(--surface3);text-align:right;white-space:nowrap;';
+  const tdS = 'padding:7px 10px;font-family:var(--mono);font-size:11px;border-bottom:1px solid #1a1f2a;text-align:right;white-space:nowrap;';
+
+  const hdrs = [
+    `<th style="${thS}text-align:center;">#</th>`,
+    `<th style="${thS}text-align:left;">Fund</th>`,
+    `<th style="${thS}">Return</th>`,
+    `<th style="${thS}">Type</th>`,
+    `<th style="${thS}">Invested</th>`,
+    `<th style="${thS}">Value</th>`,
+    `<th style="${thS}">Gain</th>`,
+    hasBench ? `<th style="${thS}color:var(--accent);">Alpha</th>` : '',
+  ].join('');
+
+  const rows = results.map((r, i) => {
+    const gain  = r.finalVal - amt;
+    const rc    = r.pct  > 0 ? '#2dd4a0' : '#f05c78';
+    const gc    = gain   > 0 ? '#2dd4a0' : '#f05c78';
+    const ac    = r.alpha != null ? (r.alpha > 0 ? '#2dd4a0' : '#f05c78') : 'var(--text3)';
+    const bg    = i % 2 === 0 ? '' : 'background:#0b0e16;';
+    const medal = i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : '';
+    const shortName = r.name.replace(/- (Direct|Regular) Plan.*/i,'').replace(/- Growth.*/i,'').trim();
+    return `<tr style="${bg}">
+      <td style="${tdS}text-align:center;color:var(--text3);">${i+1}</td>
+      <td style="${tdS}text-align:left;max-width:280px;">
+        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;color:var(--text);" title="${r.name}">${medal}${shortName}</div>
+        <div style="font-size:9px;color:var(--text3);">${r.code}</div>
+      </td>
+      <td style="${tdS}font-weight:700;color:${rc};">${r.pct>0?'+':''}${r.pct.toFixed(2)}%</td>
+      <td style="${tdS}font-size:9px;color:var(--text3);">${r.type}</td>
+      <td style="${tdS}color:var(--text2);">${fmtV(amt)}</td>
+      <td style="${tdS}color:${gc};">${fmtV(r.finalVal)}</td>
+      <td style="${tdS}color:${gc};">${gain>0?'+':''}${fmtV(gain)}</td>
+      ${hasBench ? `<td style="${tdS}font-weight:600;color:${ac};">${r.alpha!=null?(r.alpha>0?'+':'')+r.alpha.toFixed(2)+'%':'—'}</td>` : ''}
+    </tr>`;
+  }).join('');
+
+  const table = `<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;overflow:hidden;">
+    <div style="overflow-x:auto;max-height:520px;overflow-y:auto;">
+      <table id="cptprTable" style="width:100%;border-collapse:collapse;">
+        <thead><tr>${hdrs}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="padding:8px 14px;border-top:1px solid var(--border2);">
+      <span style="font-family:var(--mono);font-size:9px;color:var(--text3);">
+        * CAGR for ≥1Y · Absolute for &lt;1Y · Value = ₹${(amt/1000).toFixed(0)}K invested at start NAV · Alpha = Fund% − Bench%
+      </span>
+    </div>
+  </div>`;
+
+  resultEl.innerHTML = header + exportBar + table;
+}
+
+// ── CPTPR EXPORT PNG ────────────────────────────────────────────────────────
+
+window.cptprExportPNG = async function() {
+  const d = _cptprResults;
+  if (!d) { showToast('No results to export', 'error'); return; }
+  const { results, benchReturn, catVal, plan, amt, startDate, endDate, period, benchName } = d;
+
+  const fmtD = dt => dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const fmtV = v  => Math.abs(v) >= 10000000 ? `₹${(v/10000000).toFixed(2)}Cr` : Math.abs(v) >= 100000 ? `₹${(v/100000).toFixed(2)}L` : `₹${Math.round(v).toLocaleString('en-IN')}`;
+  const hasBench = !!benchReturn;
+  const planLabel = plan === 'direct_growth' ? 'Direct Growth' : 'Regular Growth';
+  const dateStr  = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const catLabel = document.getElementById('cptpr-category').options[document.getElementById('cptpr-category').selectedIndex].text;
+
+  const thS = 'padding:6px 10px;font-family:"IBM Plex Mono",monospace;font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;background:#111520;text-align:right;';
+  const tdS = 'padding:5px 10px;font-family:"IBM Plex Mono",monospace;font-size:10px;border-bottom:1px solid #1a1f2a;text-align:right;';
+
+  const rows = results.map((r, i) => {
+    const gain = r.finalVal - amt;
+    const rc   = r.pct  > 0 ? '#2dd4a0' : '#f05c78';
+    const gc   = gain   > 0 ? '#2dd4a0' : '#f05c78';
+    const ac   = r.alpha!=null ? (r.alpha>0?'#2dd4a0':'#f05c78') : '#555';
+    const bg   = i%2===0 ? '#0d1117' : '#0f1420';
+    const sn   = r.name.replace(/- (Direct|Regular) Plan.*/i,'').replace(/- Growth.*/i,'').trim().substring(0,45);
+    return `<tr style="background:${bg};">
+      <td style="${tdS}text-align:center;color:#6b7280;">${i+1}</td>
+      <td style="${tdS}text-align:left;color:#c0c8d8;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${sn}</td>
+      <td style="${tdS}color:${rc};font-weight:700;">${r.pct>0?'+':''}${r.pct.toFixed(2)}%</td>
+      <td style="${tdS}color:#555;font-size:9px;">${r.type}</td>
+      <td style="${tdS}color:#9aa5b4;">${fmtV(amt)}</td>
+      <td style="${tdS}color:${gc};">${fmtV(r.finalVal)}</td>
+      <td style="${tdS}color:${gc};">${gain>0?'+':''}${fmtV(gain)}</td>
+      ${hasBench?`<td style="${tdS}color:${ac};font-weight:600;">${r.alpha!=null?(r.alpha>0?'+':'')+r.alpha.toFixed(2)+'%':'—'}</td>`:''}
+    </tr>`;
+  }).join('');
+
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;background:#0d1117;overflow:hidden;border-radius:10px;';
+  el.innerHTML = `
+    <div style="padding:16px 22px;border-bottom:1px solid #2a2f3a;background:#080b12;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:#e8aa2e;letter-spacing:2px;">MF · RESEARCH</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#e8e8e8;margin-top:5px;">${catLabel} · ${planLabel}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa5b4;margin-top:3px;">${period} PTP · ${fmtD(startDate)} → ${fmtD(endDate)} · ${results.length} funds${hasBench?' · vs '+benchName+' ('+benchReturn.pct.toFixed(2)+'% '+benchReturn.type+')':''}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#e8aa2e;">VED Investment</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa5b4;margin-top:2px;">Vivek Vijaykumar Chawla</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa5b4;">ARN-253228 · EUIN E472276</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b7280;margin-top:2px;">${dateStr}</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="${thS}text-align:center;">#</th>
+        <th style="${thS}text-align:left;">Fund</th>
+        <th style="${thS}">Return</th>
+        <th style="${thS}">Type</th>
+        <th style="${thS}">Invested</th>
+        <th style="${thS}">Value</th>
+        <th style="${thS}">Gain</th>
+        ${hasBench?`<th style="${thS}color:#e8aa2e;">Alpha</th>`:''}
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="padding:10px 22px;border-top:1px solid #2a2f3a;background:#080b12;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:#e8aa2e;">VED Investment · Vivek Vijaykumar Chawla · ARN-253228</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#555;">${dateStr}</div>
+    </div>
+    <div style="padding:7px 22px 10px;background:#0a0d14;border-top:1px solid #1e2430;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#777;text-align:center;line-height:1.7;">
+        Mutual fund investments are subject to market risks, read all scheme related documents carefully.<br>
+        Past performance is not indicative of future returns. This mutual fund scheme may or may not be suitable as per your risk appetite.
+      </div>
+    </div>`;
+
+  document.body.appendChild(el);
+  showToast('Capturing…', '');
+  try {
+    const cap = await html2canvas(el, { backgroundColor:'#0d1117', scale:2, useCORS:true, logging:false });
+    const link = document.createElement('a');
+    link.download = `Cat-PTP-${catLabel.replace(/\s+/g,'-')}-${period}-${new Date().toISOString().slice(0,10)}.png`;
+    link.href = cap.toDataURL('image/png');
+    link.click();
+    showToast('PNG downloaded', 'success');
+  } catch(e) { showToast('Export failed','error'); }
+  finally { el.remove(); }
+};
+
+// ── CPTPR EXPORT PDF ────────────────────────────────────────────────────────
+
+window.cptprExportPDF = function() {
+  const d = _cptprResults;
+  if (!d) { showToast('No results to export','error'); return; }
+  const { results, benchReturn, catVal, plan, amt, startDate, endDate, period, benchName } = d;
+
+  const fmtD  = dt => dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const fmtV  = v  => Math.abs(v)>=10000000?`₹${(v/10000000).toFixed(2)}Cr`:Math.abs(v)>=100000?`₹${(v/100000).toFixed(2)}L`:`₹${Math.round(v).toLocaleString('en-IN')}`;
+  const hasBench  = !!benchReturn;
+  const planLabel = plan==='direct_growth'?'Direct Growth':'Regular Growth';
+  const dateStr   = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const catLabel  = document.getElementById('cptpr-category').options[document.getElementById('cptpr-category').selectedIndex].text;
+
+  const rows = results.map((r,i) => {
+    const gain = r.finalVal - amt;
+    return `<tr>
+      <td>${i+1}</td>
+      <td style="text-align:left;">${r.name.replace(/- (Direct|Regular) Plan.*/i,'').replace(/- Growth.*/i,'').trim()}</td>
+      <td style="color:${r.pct>0?'#16a34a':'#dc2626'};font-weight:700;">${r.pct>0?'+':''}${r.pct.toFixed(2)}%</td>
+      <td>${r.type}</td>
+      <td>${fmtV(amt)}</td>
+      <td style="color:${gain>0?'#16a34a':'#dc2626'};">${fmtV(r.finalVal)}</td>
+      <td style="color:${gain>0?'#16a34a':'#dc2626'};">${gain>0?'+':''}${fmtV(gain)}</td>
+      ${hasBench?`<td style="color:${r.alpha!=null&&r.alpha>0?'#16a34a':'#dc2626'};font-weight:600;">${r.alpha!=null?(r.alpha>0?'+':'')+r.alpha.toFixed(2)+'%':'—'}</td>`:''}
+    </tr>`;
+  }).join('');
+
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Category PTP Ranker — VED Investment</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box;}
+      body{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#1a1a1a;background:#fff;padding:24px 28px;}
+      @media print{body{padding:10px;}@page{margin:10mm;size:A4 landscape;}.no-print{display:none!important;}}
+      .hdr{border-bottom:3px solid #1a1a1a;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-end;}
+      .hdr-title{font-size:15px;font-weight:700;}.hdr-sub{font-size:10px;color:#555;margin-top:4px;}
+      .hdr-right{font-size:10px;color:#555;text-align:right;}
+      table{width:100%;border-collapse:collapse;font-size:10px;}
+      th{background:#f3f4f6;padding:6px 8px;text-align:right;font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#555;border-bottom:2px solid #e5e7eb;white-space:nowrap;}
+      th:nth-child(2){text-align:left;}td{padding:5px 8px;border-bottom:1px solid #f3f4f6;text-align:right;}
+      td:nth-child(2){text-align:left;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      td:first-child{text-align:center;color:#888;}
+      tr:nth-child(even)td{background:#fafafa;}
+      .footer{margin-top:16px;font-size:9px;color:#444;line-height:1.7;border-top:1px solid #e5e7eb;padding-top:10px;}
+      .print-btn{margin-bottom:12px;}button{background:#1a1a1a;color:#fff;border:none;padding:7px 18px;border-radius:4px;cursor:pointer;font-size:12px;}
+    </style></head><body>
+    <div class="no-print print-btn"><button onclick="window.print()">🖨 Print / Save as PDF</button></div>
+    <div class="hdr">
+      <div>
+        <div class="hdr-title">${catLabel} — Category PTP Ranker</div>
+        <div class="hdr-sub">${planLabel} · ${period} · ${fmtD(startDate)} → ${fmtD(endDate)} · ${results.length} funds${hasBench?' · vs '+benchName+' ('+benchReturn.pct.toFixed(2)+'% '+benchReturn.type+')':''}</div>
+      </div>
+      <div class="hdr-right">VED Investment · ARN-253228<br>Vivek Vijaykumar Chawla<br>${dateStr}</div>
+    </div>
+    <table><thead><tr>
+      <th>#</th><th style="text-align:left;">Fund</th><th>Return</th><th>Type</th>
+      <th>Invested</th><th>Value</th><th>Gain</th>${hasBench?'<th>Alpha</th>':''}
+    </tr></thead><tbody>${rows}</tbody></table>
+    <div class="footer">
+      * CAGR for ≥1Y · Absolute return for &lt;1Y · Alpha = Fund% − Benchmark% · Value based on ₹${(amt/1000).toFixed(0)}K lump sum invested at period start NAV<br><br>
+      Mutual fund investments are subject to market risks, read all scheme related documents carefully. Past performance is not indicative of future returns. This mutual fund scheme may or may not be suitable as per your risk appetite.
+    </div></body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 600);
 };
 
 // ══════════════════════════════════════════════════════
