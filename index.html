@@ -1418,9 +1418,14 @@
           <div style="margin-bottom:14px;">
             <label class="input-label" style="margin-bottom:8px;display:block;">Period</label>
             <div style="display:flex;gap:6px;flex-wrap:wrap;" id="cptprPeriodPills">
-              ${['1M','3M','6M','1Y','2Y','3Y','5Y','10Y'].map((p,i) =>
-                `<button class="bench-pill${p==='1Y'?' active':''}" id="cptpr-pp-${i}" onclick="cptprSelectPeriod('${p}',${i})">${p}</button>`
-              ).join('')}
+              <button class="bench-pill" id="cptpr-pp-0" onclick="cptprSelectPeriod('1M',0)">1M</button>
+              <button class="bench-pill" id="cptpr-pp-1" onclick="cptprSelectPeriod('3M',1)">3M</button>
+              <button class="bench-pill" id="cptpr-pp-2" onclick="cptprSelectPeriod('6M',2)">6M</button>
+              <button class="bench-pill active" id="cptpr-pp-3" onclick="cptprSelectPeriod('1Y',3)">1Y</button>
+              <button class="bench-pill" id="cptpr-pp-4" onclick="cptprSelectPeriod('2Y',4)">2Y</button>
+              <button class="bench-pill" id="cptpr-pp-5" onclick="cptprSelectPeriod('3Y',5)">3Y</button>
+              <button class="bench-pill" id="cptpr-pp-6" onclick="cptprSelectPeriod('5Y',6)">5Y</button>
+              <button class="bench-pill" id="cptpr-pp-7" onclick="cptprSelectPeriod('10Y',7)">10Y</button>
             </div>
           </div>
 
@@ -8593,6 +8598,24 @@ function calc1Day(navArr) {
   return { nav: latest.nav, prevNav: prev.nav, pct, date: latest.date };
 }
 
+// Benchmark 1-day change anchored to a specific date (fund's NAV date)
+// Ensures fund and benchmark are compared over the SAME calendar window
+function calc1DayAsOf(navArr, asOfDate) {
+  if (!navArr || !asOfDate) return null;
+  // Find benchmark NAV on or before fund's date
+  const t = asOfDate.getTime();
+  let endIdx = -1;
+  for (let i = navArr.length - 1; i >= 0; i--) {
+    if (navArr[i].date.getTime() <= t) { endIdx = i; break; }
+  }
+  if (endIdx <= 0) return null;       // need at least one prior entry
+  const endNav  = navArr[endIdx];
+  const prevNav = navArr[endIdx - 1];
+  if (!prevNav?.nav || !endNav?.nav) return null;
+  const pct = ((endNav.nav - prevNav.nav) / prevNav.nav) * 100;
+  return { nav: endNav.nav, prevNav: prevNav.nav, pct, date: endNav.date };
+}
+
 async function loadWatchlistMonitor() {
   const ct = document.getElementById('compareTable');
   if (!ct) return;
@@ -8650,7 +8673,7 @@ async function loadWatchlistMonitor() {
       const fNav = fundNav[f.schemeCode];
       const f1d  = calc1Day(fNav);
       const bNav = f.benchCode ? benchNav[f.benchCode] : null;
-      const b1d  = bNav ? calc1Day(bNav) : null;
+      const b1d  = (bNav && f1d) ? calc1DayAsOf(bNav, f1d.date) : null;
 
       const fPctStr  = f1d  ? `${f1d.pct  > 0 ? '+' : ''}${f1d.pct.toFixed(3)}%`  : '—';
       const bPctStr  = b1d  ? `${b1d.pct  > 0 ? '+' : ''}${b1d.pct.toFixed(3)}%`  : '—';
@@ -9505,12 +9528,13 @@ window.runCPTPR = async function() {
   }
 
   results.sort((a, b) => b.pct - a.pct);
-  _cptprResults = { results, benchReturn, catVal, plan, amt, startDate, endDate, period: _cptprPeriod, benchName: _cptprBenchName };
+  const periodLabel = (custS && custE) ? 'Custom' : asOnVal ? `${_cptprPeriod} (As On ${new Date(asOnVal).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})})` : _cptprPeriod;
+  _cptprResults = { results, benchReturn, catVal, plan, amt, startDate, endDate, period: _cptprPeriod, periodLabel, benchName: _cptprBenchName };
   statusEl.textContent = `✓ ${results.length} funds ranked`;
   cptprRenderResults(_cptprResults);
 };
 
-function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate, endDate, period, benchName }) {
+function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate, endDate, period, periodLabel, benchName }) {
   const resultEl = document.getElementById('cptprResult');
   if (!resultEl) return;
 
@@ -9522,7 +9546,7 @@ function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate
   // Summary header
   const catLabel = document.getElementById('cptpr-category').options[document.getElementById('cptpr-category').selectedIndex].text;
   const header   = `<div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-bottom:12px;">
-    ${catLabel} · ${planLabel} · ${period} PTP · ${fmtD(startDate)} → ${fmtD(endDate)} · ${results.length} funds
+    ${catLabel} · ${planLabel} · ${periodLabel} PTP · ${fmtD(startDate)} → ${fmtD(endDate)} · ${results.length} funds
     ${hasBench ? ` · vs <span style="color:var(--text2);">${benchName}</span> (${benchReturn.pct>0?'+':''}${benchReturn.pct.toFixed(2)}% ${benchReturn.type})` : ''}
   </div>`;
 
@@ -9593,7 +9617,7 @@ function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate
 window.cptprExportPNG = async function() {
   const d = _cptprResults;
   if (!d) { showToast('No results to export', 'error'); return; }
-  const { results, benchReturn, catVal, plan, amt, startDate, endDate, period, benchName } = d;
+  const { results, benchReturn, catVal, plan, amt, startDate, endDate, period, periodLabel, benchName } = d;
 
   const fmtD = dt => dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   const fmtV = v  => Math.abs(v) >= 10000000 ? `₹${(v/10000000).toFixed(2)}Cr` : Math.abs(v) >= 100000 ? `₹${(v/100000).toFixed(2)}L` : `₹${Math.round(v).toLocaleString('en-IN')}`;
@@ -9631,7 +9655,7 @@ window.cptprExportPNG = async function() {
       <div>
         <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:#e8aa2e;letter-spacing:2px;">MF · RESEARCH</div>
         <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#e8e8e8;margin-top:5px;">${catLabel} · ${planLabel}</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa5b4;margin-top:3px;">${period} PTP · ${fmtD(startDate)} → ${fmtD(endDate)} · ${results.length} funds${hasBench?' · vs '+benchName+' ('+benchReturn.pct.toFixed(2)+'% '+benchReturn.type+')':''}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa5b4;margin-top:3px;">${periodLabel} PTP · ${fmtD(startDate)} → ${fmtD(endDate)} · ${results.length} funds${hasBench?' · vs '+benchName+' ('+benchReturn.pct.toFixed(2)+'% '+benchReturn.type+')':''}</div>
       </div>
       <div style="text-align:right;">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#e8aa2e;">VED Investment</div>
@@ -9669,7 +9693,7 @@ window.cptprExportPNG = async function() {
   try {
     const cap = await html2canvas(el, { backgroundColor:'#0d1117', scale:2, useCORS:true, logging:false });
     const link = document.createElement('a');
-    link.download = `Cat-PTP-${catLabel.replace(/\s+/g,'-')}-${period}-${new Date().toISOString().slice(0,10)}.png`;
+    link.download = `Cat-PTP-${catLabel.replace(/\s+/g,'-')}-${periodLabel}-${new Date().toISOString().slice(0,10)}.png`;
     link.href = cap.toDataURL('image/png');
     link.click();
     showToast('PNG downloaded', 'success');
@@ -9682,7 +9706,7 @@ window.cptprExportPNG = async function() {
 window.cptprExportPDF = function() {
   const d = _cptprResults;
   if (!d) { showToast('No results to export','error'); return; }
-  const { results, benchReturn, catVal, plan, amt, startDate, endDate, period, benchName } = d;
+  const { results, benchReturn, catVal, plan, amt, startDate, endDate, period, periodLabel, benchName } = d;
 
   const fmtD  = dt => dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   const fmtV  = v  => Math.abs(v)>=10000000?`₹${(v/10000000).toFixed(2)}Cr`:Math.abs(v)>=100000?`₹${(v/100000).toFixed(2)}L`:`₹${Math.round(v).toLocaleString('en-IN')}`;
@@ -9728,7 +9752,7 @@ window.cptprExportPDF = function() {
     <div class="hdr">
       <div>
         <div class="hdr-title">${catLabel} — Category PTP Ranker</div>
-        <div class="hdr-sub">${planLabel} · ${period} · ${fmtD(startDate)} → ${fmtD(endDate)} · ${results.length} funds${hasBench?' · vs '+benchName+' ('+benchReturn.pct.toFixed(2)+'% '+benchReturn.type+')':''}</div>
+        <div class="hdr-sub">${planLabel} · ${periodLabel} · ${fmtD(startDate)} → ${fmtD(endDate)} · ${results.length} funds${hasBench?' · vs '+benchName+' ('+benchReturn.pct.toFixed(2)+'% '+benchReturn.type+')':''}</div>
       </div>
       <div class="hdr-right">VED Investment · ARN-253228<br>Vivek Vijaykumar Chawla<br>${dateStr}</div>
     </div>
