@@ -2141,6 +2141,20 @@ const db = getFirestore(app);
 // ─── STATE ───────────────────────────────────────────────
 let watchlist = {};
 let allFunds = [];
+// The mfapi mirror occasionally returns duplicate rows for the same schemeCode.
+// Always dedupe right after fetching the full fund list, before it's cached/used anywhere.
+function _dedupeFundList(arr) {
+  if (!Array.isArray(arr)) return arr;
+  const seen = new Set();
+  const out = [];
+  for (const f of arr) {
+    const code = String(f.schemeCode);
+    if (seen.has(code)) continue;
+    seen.add(code);
+    out.push(f);
+  }
+  return out;
+}
 let selectedFund = null;
 let selectedMetricTab = 'returns';
 let compareMode = 'watchlist';
@@ -2857,10 +2871,18 @@ function buildSIPCashflows(navArr, startDate, endDate, amt, frequency = 'monthly
   }
 
   if (!cashflows.length) return cashflows;
-  // Redemption at end
+  // Redemption at end — anchor to the nearest available NAV on/before the
+  // requested endDate, NOT blindly the newest NAV in the whole fetched array.
+  // (Fetched navArr always includes history up to "today"; if endDate is a
+  // custom/as-on date in the past, redeeming at today's NAV silently pulls
+  // in unrelated later data and can badly distort XIRR.)
   const totalUnits = cashflows.reduce((s, c) => s + Math.abs(c.amount) / c.nav, 0);
-  const lastNav = navArr[navArr.length - 1];
-  cashflows.push({ date: lastNav.date, amount: totalUnits * lastNav.nav });
+  const endMs = new Date(endDate).getTime();
+  let redemptionNav = navArr[navArr.length - 1];
+  for (let i = navArr.length - 1; i >= 0; i--) {
+    if (navArr[i].date.getTime() <= endMs) { redemptionNav = navArr[i]; break; }
+  }
+  cashflows.push({ date: redemptionNav.date, amount: totalUnits * redemptionNav.nav });
   return cashflows;
 }
 
@@ -3230,7 +3252,7 @@ function renderRiskSection(risk) {
         <option value="120841">Nifty Next 50 - UTI Regular</option>
         <option value="135781">Nifty Midcap 150 - Motilal Oswal</option>
         <option value="147622">Nifty Smallcap 250 - Nippon India</option>
-        <option value="145552">Nifty LargeMidcap 250 - Edelweiss</option>
+        <option value="149343">Nifty LargeMidcap 250 - Edelweiss</option>
       </select>
       <button class="btn btn-primary" onclick="loadRiskBenchmark()">Load / Change</button>
       <span id="riskBenchStatus" style="font-size:11px;font-family:var(--mono);color:var(--text3);"></span>
@@ -3604,7 +3626,7 @@ const BENCH_CODES = {
   '120841': 'UTI Nifty Next 50 Regular Growth',
   '135781': 'Motilal Oswal Nifty Midcap 150 Direct',
   '147622': 'Nippon India Nifty Smallcap 250 Direct',
-  '145552': 'Edelweiss Nifty LargeMidcap 250 Direct',
+  '149343': 'Edelweiss Nifty LargeMidcap 250 Direct',
 };
 
 // State for each calc page
@@ -4104,7 +4126,7 @@ const SHARED_BENCH_PILLS = [
   { label:'Nifty Next 50',   code:'143341' },
   { label:'Midcap 150',      code:'147622' },
   { label:'Smallcap 250',    code:'148519' },
-  { label:'LargeMidcap 250', code:'149339' },
+  { label:'LargeMidcap 250', code:'149343' },
   { label:'N500 Multicap',   code:'152778' },
 ];
 
@@ -4735,7 +4757,7 @@ window.loadAMCFundList = async function() {
   document.getElementById('amcLoadStatus').textContent = 'Loading funds...';
   document.getElementById('amcChecklist').innerHTML = `<div class="loading-wrap" style="padding:20px 0;"><div class="spinner"></div><span>Fetching fund list...</span></div>`;
   if (allFunds.length === 0) {
-    const _r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf'); allFunds = await _r.json();
+    const _r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf'); allFunds = _dedupeFundList(await _r.json());
   }
   // Exact match — fund name must contain the verified AMC string (case-insensitive)
   const matchLower = exactMatch.toLowerCase();
@@ -5315,7 +5337,7 @@ window.loadCategoryFunds = async function() {
   document.getElementById('catFundCount').textContent = 'Loading fund list...';
 
   if (allFunds.length === 0) {
-    const _r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf'); allFunds = await _r.json();
+    const _r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf'); allFunds = _dedupeFundList(await _r.json());
   }
 
   // Filter by plan type
@@ -6413,7 +6435,7 @@ window.buildCatHeatmap = async function() {
   const resultEl = document.getElementById('heatmapResult');
   resultEl.innerHTML = `<div class="loading-wrap"><div class="spinner"></div><span>Loading fund list...</span></div>`;
 
-  if (allFunds.length === 0) { const _r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf'); allFunds = await _r.json(); }
+  if (allFunds.length === 0) { const _r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf'); allFunds = _dedupeFundList(await _r.json()); }
   const keywords = HEATMAP_CAT_KEYWORDS[cat] || [cat];
   // Get Direct Growth funds only, max 30
   let funds = allFunds.filter(f => {
@@ -7416,7 +7438,7 @@ window.runCSR = async function() {
   if (allFunds.length === 0) {
     try {
       const r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf');
-      allFunds = await r.json();
+      allFunds = _dedupeFundList(await r.json());
     } catch(e) { showToast('Could not load fund list', 'error'); resultEl.innerHTML = ''; statusEl.textContent = ''; return; }
   }
 
@@ -7467,6 +7489,7 @@ window.runCSR = async function() {
     .map(f => ({ ...f, planType: detectPlanType(f.schemeName) }))
     .filter(f => f.planType === plan);
 
+  await _ensureStaleFilter();
   if (_staleCodes && _staleCodes.size > 0)
     funds = funds.filter(f => !_staleCodes.has(String(f.schemeCode)));
 
@@ -8485,7 +8508,7 @@ const WL_BENCH_PILLS = [
   { label:'Nifty Next 50',   code:'143341' },
   { label:'Midcap 150',      code:'147622' },
   { label:'Smallcap 250',    code:'148519' },
-  { label:'LargeMidcap 250', code:'149339' },
+  { label:'LargeMidcap 250', code:'149343' },
   { label:'N500 Multicap',   code:'152778' },
 ];
 
@@ -9445,7 +9468,7 @@ window.runCPTPR = async function() {
   if (!window.allFunds) {
     try {
       const r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf/latest');
-      window.allFunds = await r.json();
+      window.allFunds = _dedupeFundList(await r.json());
     } catch(e) { showToast('Could not load fund list', 'error'); statusEl.textContent = ''; return; }
   }
 
