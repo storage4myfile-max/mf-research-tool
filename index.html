@@ -3806,6 +3806,9 @@ window.exportSnapshotPNG = async function(wrapId, filename) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) { showToast('No results to export', 'error'); return; }
 
+  const bars = wrap.querySelectorAll('.export-bar');
+  bars.forEach(b => b.style.display = 'none');
+
   const header = document.createElement('div');
   header.className = 'png-export-header';
   header.style.cssText = 'padding:12px 16px;border-bottom:1px solid var(--border2);';
@@ -3839,6 +3842,7 @@ window.exportSnapshotPNG = async function(wrapId, filename) {
     wrap.querySelector('.png-export-header')?.remove();
     wrap.querySelector('.png-export-footer')?.remove();
     wrap.querySelector('.png-export-disc')?.remove();
+    bars.forEach(b => b.style.display = '');
   }
 };
 
@@ -3975,6 +3979,9 @@ window.sipCalcExportPNG = async function() {
   const wrap = document.getElementById('sipcalc-snapshot');
   if (!wrap) { showToast('No results to export', 'error'); return; }
 
+  const bars = wrap.querySelectorAll('.export-bar');
+  bars.forEach(b => b.style.display = 'none');
+
   // Add a branded header temporarily for the export
   const header = document.createElement('div');
   header.id = 'sipcalc-png-header';
@@ -4017,6 +4024,7 @@ window.sipCalcExportPNG = async function() {
     document.getElementById('sipcalc-png-header')?.remove();
     document.getElementById('sipcalc-png-footer')?.remove();
     document.getElementById('sipcalc-png-disc')?.remove();
+    bars.forEach(b => b.style.display = '');
   }
 };
 
