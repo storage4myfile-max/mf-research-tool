@@ -3781,21 +3781,66 @@ function summaryBoxes(boxes) {
 
 function resultsTable(cols, rows, note, tableId, title) {
   const tid = tableId || ('tbl_'+Math.random().toString(36).slice(2,7));
+  const wrapId = tid + '-snap';
   const exportTitle = title || 'MF_Research_Export';
   const header = cols.map(c => {
     if (c.left || c.nosort) return `<th style="text-align:left;">${c.label}</th>`;
     return `<th onclick="sortGenericTable('${tid}',${cols.indexOf(c)})" style="cursor:pointer;user-select:none;" class="sortable-th" data-col="${cols.indexOf(c)}">${c.label} <span style="opacity:0.4;font-size:9px;">⇅</span></th>`;
   }).join('');
-  return `<div class="export-bar">
+  return `<div id="${wrapId}"><div class="export-bar">
     <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
     <button class="btn-export btn-export-csv"  onclick="exportTableCSV('${tid}','${exportTitle}')">⬇ CSV</button>
     <button class="btn-export btn-export-xlsx" onclick="exportTableXLSX('${tid}','${exportTitle}')">⬇ Excel</button>
+    <button class="btn-export btn-export-png"  onclick="exportSnapshotPNG('${wrapId}','${exportTitle}')">⬇ PNG</button>
   </div>
   <div class="compare-table-wrap"><table class="compare-table" style="min-width:560px;" id="${tid}">
     <thead><tr>${header}</tr></thead>
     <tbody>${rows}</tbody></table></div>
-    ${note ? `<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:8px;">${note}</div>` : ''}`;
+    ${note ? `<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:8px;">${note}</div>` : ''}</div>`;
 }
+
+// ─── SHARED PNG SNAPSHOT EXPORT ──────────────────────────────────────────
+// Generic branded PNG capture used by every export bar in the app. Wrap any
+// results block in a div with a unique id, then call this with that id.
+window.exportSnapshotPNG = async function(wrapId, filename) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) { showToast('No results to export', 'error'); return; }
+
+  const header = document.createElement('div');
+  header.className = 'png-export-header';
+  header.style.cssText = 'padding:12px 16px;border-bottom:1px solid var(--border2);';
+  header.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#e8aa2e;">VED INVESTMENT · MF RESEARCH</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888;margin-top:3px;">${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>`;
+  wrap.insertBefore(header, wrap.firstChild);
+
+  const footer = document.createElement('div');
+  footer.className = 'png-export-footer';
+  footer.style.cssText = 'padding:10px 16px;border-top:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center;';
+  footer.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#e8aa2e;font-weight:700;">VED Investment · Vivek Vijaykumar Chawla · ARN-253228</div>`;
+  wrap.appendChild(footer);
+
+  const disc = document.createElement('div');
+  disc.className = 'png-export-disc';
+  disc.style.cssText = 'padding:7px 16px;background:#0a0d14;border-top:1px solid var(--border2);';
+  disc.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888;text-align:center;line-height:1.6;">Mutual fund investments are subject to market risks, read all scheme related documents carefully. Past performance is not indicative of future returns.</div>`;
+  wrap.appendChild(disc);
+
+  showToast('Capturing…', '');
+  try {
+    const canvas = await html2canvas(wrap, { backgroundColor: '#0d1117', scale: 2, useCORS: true, logging: false });
+    const link = document.createElement('a');
+    link.download = (filename || 'MF_Research_Export') + '_' + new Date().toISOString().split('T')[0] + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('PNG downloaded', 'success');
+  } catch(e) {
+    showToast('Export failed', 'error');
+  } finally {
+    wrap.querySelector('.png-export-header')?.remove();
+    wrap.querySelector('.png-export-footer')?.remove();
+    wrap.querySelector('.png-export-disc')?.remove();
+  }
+};
 
 window.sortGenericTable = function(tableId, colIdx) {
   const table = document.getElementById(tableId);
@@ -3914,7 +3959,12 @@ window.calcSIP = async function() {
     }).join('');
     const cols = [{label:'Fund',left:true,nosort:true},{label:'XIRR'},{label:'Invested'},{label:'Final Value'},{label:'Gain/Loss'},{label:'Abs Return'},...(bench?[{label:'Alpha'}]:[])];
     const tableHTML = resultsTable(cols, tableRows, `* ${freqLabel} SIP · XIRR via Newton-Raphson${bench ? ' · Alpha column in expanded instalment view = per-instalment fund return minus benchmark return' : ''}`, 'sipcalc-tbl', 'SIP_Comparison');
-    const tableHTMLWithPng = tableHTML.replace('⬇ Excel</button>', '⬇ Excel</button><button class="btn-export" onclick="window.sipCalcExportPNG()">⬇ PNG</button>');
+    // Repoint resultsTable's built-in PNG button to capture the full snapshot
+    // (summary cards + table) instead of just the table, since we have both here.
+    const tableHTMLWithPng = tableHTML.replace(
+      /<button class="btn-export btn-export-png"[^>]*>⬇ PNG<\/button>/,
+      '<button class="btn-export btn-export-png" onclick="window.sipCalcExportPNG()">⬇ PNG</button>'
+    );
     resultEl.innerHTML = `<div id="sipcalc-snapshot">${summary}${tableHTMLWithPng}</div>`;
     window._sipCalcSnapshotMeta = `${freqLabel} SIP · ₹${amt.toLocaleString('en-IN')} · ${startStr} → ${endStr}${bench ? ' · vs ' + bench.name : ''}`;
     window._sipCalcSnapshotFile = `SIP-Comparison_${new Date().toISOString().split('T')[0]}`;
@@ -4913,11 +4963,14 @@ window.runAMCCompare = async function() {
     return `<tr><td title="${r.name}" style="text-align:left;max-width:240px;white-space:normal;font-size:11px;">${r.name.substring(0,55)}${r.name.length>55?'…':''}<div style="font-size:10px;color:var(--text3);font-family:var(--mono);">${r.code}</div></td>${cols}</tr>`;
   }).join('');
   const amcExportId = 'amcTbl_'+Date.now();
+  const amcWrapId = amcExportId + '-snap';
   document.getElementById('amcResult').innerHTML = `
+    <div id="${amcWrapId}">
     <div class="export-bar">
       <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
       <button class="btn-export btn-export-csv"  onclick="exportTableCSV('${amcExportId}','AMC_Compare')">⬇ CSV</button>
       <button class="btn-export btn-export-xlsx" onclick="exportTableXLSX('${amcExportId}','AMC_Compare')">⬇ Excel</button>
+      <button class="btn-export btn-export-png"  onclick="exportSnapshotPNG('${amcWrapId}','AMC_Compare')">⬇ PNG</button>
     </div>
     <div class="compare-table-wrap">
       <table class="compare-table" style="min-width:700px;" id="${amcExportId}">
@@ -4925,7 +4978,8 @@ window.runAMCCompare = async function() {
         <tbody>${tableRows}</tbody>
       </table>
     </div>
-    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:8px;">* Returns are CAGR for ≥1Y periods, Abs for shorter · SI = Since Inception</div>`;
+    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:8px;">* Returns are CAGR for ≥1Y periods, Abs for shorter · SI = Since Inception</div>
+    </div>`;
 }
 
 // ─── STEP-UP SIP CALCULATOR ─────────────────────────────
@@ -6447,8 +6501,10 @@ window.buildScorecard = async function() {
     </tr>`;
 
   const benchNote = benchNavArr ? `vs ${benchName.substring(0,40)}` : 'No benchmark selected';
+  const scWrapId = scTid + '-snap';
 
   resultEl.innerHTML = `
+    <div id="${scWrapId}">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
       <div style="font-size:11px;font-family:var(--mono);color:var(--text3);">${okRows.length} funds · Color: <span style="color:var(--accent2);">green=best</span> / <span style="color:var(--danger);">red=worst</span> per column · Click headers to sort</div>
       <div style="font-size:10px;font-family:var(--mono);color:var(--text3);">${benchNote}</div>
@@ -6457,6 +6513,7 @@ window.buildScorecard = async function() {
       <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
       <button class="btn-export btn-export-csv"  onclick="exportTableCSV('${scTid}','Fund_Scorecard')">⬇ CSV</button>
       <button class="btn-export btn-export-xlsx" onclick="exportTableXLSX('${scTid}','Fund_Scorecard')">⬇ Excel</button>
+      <button class="btn-export btn-export-png"  onclick="exportSnapshotPNG('${scWrapId}','Fund_Scorecard')">⬇ PNG</button>
     </div>
     <div class="compare-table-wrap" style="overflow-x:auto;margin-top:8px;">
       <table class="compare-table" id="${scTid}" style="min-width:1200px;font-size:11px;">
@@ -6466,6 +6523,7 @@ window.buildScorecard = async function() {
     </div>
     <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:8px;">
       * Trailing: CAGR for ≥1Y, Abs for <1Y · Alpha = fund return minus benchmark return for same period · Risk: Rf=6.5% · Rolling: median CAGR · Fund column is sticky
+    </div>
     </div>`;
 }
 
