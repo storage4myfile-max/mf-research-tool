@@ -3754,7 +3754,7 @@ async function loadBenchmark(benchCode, startDate, endDate, amt, mode) {
     const bName = BENCH_CODES[benchCode] || bData.meta?.scheme_name || benchCode;
     if (mode === 'sip') {
       const bCF = buildSIPCashflows(bNavArr, startDate, endDate, amt);
-      return { xirr: calcXIRR(bCF), finalVal: bCF[bCF.length-1].amount, invested: bCF.filter(c=>c.amount<0).length*amt, name: bName, navArr: bNavArr };
+      return { xirr: calcXIRR(bCF), finalVal: bCF[bCF.length-1].amount, invested: bCF.filter(c=>c.amount<0).length*amt, name: bName, navArr: bNavArr, cf: bCF };
     } else if (mode === 'ptp') {
       const sn = closestNav(bNavArr, startDate);
       const en = closestNav(bNavArr, endDate);
@@ -3882,6 +3882,8 @@ window.calcSIP = async function() {
       {label:'Worst XIRR', value:`${worstXirr.toFixed(2)}%`, sub:okR.find(r=>r.xirr===worstXirr)?.name?.substring(0,35)||'', color: worstXirr<0?'var(--danger)':'var(--warn)'},
     ]);
     window._sipCalcCF = {};
+    window._sipCalcBenchCF = bench ? bench.cf : null;
+    window._sipCalcBenchName = bench ? bench.name : null;
     const tableRows = results.map((r,i)=>{
       if (!r.ok) return `<tr><td colspan="7" style="color:var(--danger);font-size:11px;">${r.name} — ${r.error}</td></tr>`;
       if (r.cf) window._sipCalcCF[r.code] = r.cf;
@@ -3911,9 +3913,62 @@ window.calcSIP = async function() {
       <tr id="sipcalc-txn-${r.code}" style="display:none;"><td colspan="${bench?7:6}" style="padding:0;"></td></tr>`;
     }).join('');
     const cols = [{label:'Fund',left:true,nosort:true},{label:'XIRR'},{label:'Invested'},{label:'Final Value'},{label:'Gain/Loss'},{label:'Abs Return'},...(bench?[{label:'Alpha'}]:[])];
-    resultEl.innerHTML = summary + resultsTable(cols, tableRows, `* ${freqLabel} SIP · XIRR via Newton-Raphson`);
+    const tableHTML = resultsTable(cols, tableRows, `* ${freqLabel} SIP · XIRR via Newton-Raphson${bench ? ' · Alpha column in expanded instalment view = per-instalment fund return minus benchmark return' : ''}`, 'sipcalc-tbl', 'SIP_Comparison');
+    const tableHTMLWithPng = tableHTML.replace('⬇ Excel</button>', '⬇ Excel</button><button class="btn-export" onclick="window.sipCalcExportPNG()">⬇ PNG</button>');
+    resultEl.innerHTML = `<div id="sipcalc-snapshot">${summary}${tableHTMLWithPng}</div>`;
+    window._sipCalcSnapshotMeta = `${freqLabel} SIP · ₹${amt.toLocaleString('en-IN')} · ${startStr} → ${endStr}${bench ? ' · vs ' + bench.name : ''}`;
+    window._sipCalcSnapshotFile = `SIP-Comparison_${new Date().toISOString().split('T')[0]}`;
   } catch(e) { resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:12px;padding:12px;">${e.message}</div>`; }
 }
+
+window.sipCalcExportPNG = async function() {
+  const wrap = document.getElementById('sipcalc-snapshot');
+  if (!wrap) { showToast('No results to export', 'error'); return; }
+
+  // Add a branded header temporarily for the export
+  const header = document.createElement('div');
+  header.id = 'sipcalc-png-header';
+  header.style.cssText = 'padding:12px 16px;border-bottom:1px solid var(--border2);';
+  header.innerHTML = `
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#e8aa2e;">VED INVESTMENT · MF RESEARCH</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888;margin-top:3px;">${window._sipCalcSnapshotMeta || ''}</div>`;
+  wrap.insertBefore(header, wrap.firstChild);
+
+  const footer = document.createElement('div');
+  footer.id = 'sipcalc-png-footer';
+  footer.style.cssText = 'padding:10px 16px;border-top:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center;';
+  footer.innerHTML = `
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#e8aa2e;font-weight:700;">VED Investment · Vivek Vijaykumar Chawla · ARN-253228</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#555;">${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>`;
+  wrap.appendChild(footer);
+
+  const disc = document.createElement('div');
+  disc.id = 'sipcalc-png-disc';
+  disc.style.cssText = 'padding:7px 16px;background:#0a0d14;border-top:1px solid var(--border2);';
+  disc.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888;text-align:center;line-height:1.6;">Mutual fund investments are subject to market risks, read all scheme related documents carefully. Past performance is not indicative of future returns.</div>`;
+  wrap.appendChild(disc);
+
+  showToast('Capturing…', '');
+  try {
+    const canvas = await html2canvas(wrap, {
+      backgroundColor: '#0d1117',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+    const link = document.createElement('a');
+    link.download = (window._sipCalcSnapshotFile || 'SIP-Comparison') + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('PNG downloaded', 'success');
+  } catch(e) {
+    showToast('Export failed', 'error');
+  } finally {
+    document.getElementById('sipcalc-png-header')?.remove();
+    document.getElementById('sipcalc-png-footer')?.remove();
+    document.getElementById('sipcalc-png-disc')?.remove();
+  }
+};
 
 // ─── PTP MULTI CALC ──────────────────────────────────────
 window.calcPTPMulti = async function() {
@@ -7775,6 +7830,17 @@ window._toggleSIPCalcTxn = function(code) {
   const totalUnits  = instalments.reduce((s, c) => s + Math.abs(c.amount) / c.nav, 0);
   const currentNav  = redemption.amount / totalUnits;
 
+  // Per-installment alpha vs benchmark, if a benchmark was selected for this run.
+  const benchCF = window._sipCalcBenchCF;
+  let benchInstalments = null, benchCurrentNav = null;
+  if (benchCF && benchCF.length > 1) {
+    benchInstalments = benchCF.filter(c => c.amount < 0);
+    const benchRedemption  = benchCF[benchCF.length - 1];
+    const benchTotalUnits  = benchInstalments.reduce((s, c) => s + Math.abs(c.amount) / c.nav, 0);
+    benchCurrentNav = benchRedemption.amount / benchTotalUnits;
+  }
+  const hasAlpha = !!(benchInstalments && benchInstalments.length);
+
   const fmt  = v => v >= 10000000 ? "₹"+(v/10000000).toFixed(2)+"Cr" : v >= 100000 ? "₹"+(v/100000).toFixed(2)+"L" : "₹"+(v/1000).toFixed(2)+"K";
   const fmtN = v => v.toFixed(4);
   const fmtD = d => d instanceof Date ? d.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "—";
@@ -7790,6 +7856,18 @@ window._toggleSIPCalcTxn = function(code) {
     cumUnits    += units;
     const absRet = ((currentNav - c.nav) / c.nav) * 100;
     const retCol = absRet >= 0 ? "var(--positive)" : "var(--negative)";
+    let alphaCell = '';
+    if (hasAlpha) {
+      const bInst = benchInstalments[i];
+      if (bInst) {
+        const bAbsRet  = ((benchCurrentNav - bInst.nav) / bInst.nav) * 100;
+        const alpha    = absRet - bAbsRet;
+        const alphaCol = alpha >= 0 ? "var(--positive)" : "var(--negative)";
+        alphaCell = `<td style="${tdSt}font-weight:600;color:${alphaCol};">${alpha>=0?"+":""}${alpha.toFixed(2)}%</td>`;
+      } else {
+        alphaCell = `<td style="${tdSt}color:var(--text3);">—</td>`;
+      }
+    }
     return `<tr onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'transparent\'">
       <td style="${tdSt}text-align:center;color:var(--text3);">${i+1}</td>
       <td style="${tdStL}">${fmtD(c.date)}</td>
@@ -7798,6 +7876,7 @@ window._toggleSIPCalcTxn = function(code) {
       <td style="${tdSt}color:var(--text2);">${fmtN(units)}</td>
       <td style="${tdSt}color:var(--text2);">${fmtN(cumUnits)}</td>
       <td style="${tdSt}font-weight:600;color:${retCol};">${absRet>=0?"+":""}${absRet.toFixed(2)}%</td>
+      ${alphaCell}
     </tr>`;
   }).join("");
 
@@ -7827,6 +7906,7 @@ window._toggleSIPCalcTxn = function(code) {
           <th style="${thSt}">Units</th>
           <th style="${thSt}">Cum. Units</th>
           <th style="${thSt}">Abs Return</th>
+          ${hasAlpha ? `<th style="${thSt}color:var(--accent);">Alpha</th>` : ''}
         </tr></thead>
         <tbody>${txnRows}</tbody>
       </table>
