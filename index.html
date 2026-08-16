@@ -974,6 +974,7 @@
     <div class="nav-tab" onclick="switchPage('catheatmap')">Cat Heatmap</div>
     <div class="nav-tab" onclick="switchPage('isinlookup')">ISIN</div>
     <div class="nav-tab" onclick="switchPage('navdl')">NAV Data</div>
+    <div class="nav-tab" onclick="switchPage('taxcalc')">Tax Estimator</div>
   </div>
   <div style="display:flex;align-items:center;gap:12px;">
     <div class="sync-status">
@@ -1027,6 +1028,7 @@
       <div class="mobile-nav-item" id="mnav-swpcalc" onclick="mobileNav('swpcalc')"><span class="mobile-nav-icon">💸</span>SWP Calc</div>
       <div class="mobile-nav-item" id="mnav-lumpsip" onclick="mobileNav('lumpsip')"><span class="mobile-nav-icon">💰</span>Lump+SIP</div>
       <div class="mobile-nav-item" id="mnav-goalcalc" onclick="mobileNav('goalcalc')"><span class="mobile-nav-icon">🎯</span>Goal Calc</div>
+      <div class="mobile-nav-item" id="mnav-taxcalc" onclick="mobileNav('taxcalc')"><span class="mobile-nav-icon">🧾</span>Tax Estimator</div>
     </div>
     <div class="mobile-drawer-section">
       <div class="mobile-drawer-label">Portfolio Analysis</div>
@@ -1221,8 +1223,8 @@
             <div class="input-group">
               <label class="input-label">Plan Type</label>
               <select class="input-field" id="csr-plan" style="width:130px;">
-                <option value="direct_growth">Direct Growth</option>
                 <option value="regular_growth">Regular Growth</option>
+                <option value="direct_growth">Direct Growth</option>
               </select>
             </div>
             <div class="input-group">
@@ -1404,8 +1406,8 @@
             <div class="input-group">
               <label class="input-label">Plan Type</label>
               <select class="input-field" id="cptpr-plan" style="width:140px;">
-                <option value="direct_growth">Direct Growth</option>
                 <option value="regular_growth">Regular Growth</option>
+                <option value="direct_growth">Direct Growth</option>
               </select>
             </div>
             <div class="input-group">
@@ -1909,6 +1911,74 @@
       </div>
     </div>
 
+    <!-- REDEMPTION TAX ESTIMATOR PAGE -->
+    <div class="page" id="page-taxcalc">
+      <div class="section-title">Redemption Tax Estimator</div>
+      <div class="ptp-card">
+        <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:18px;line-height:1.6;">
+          Estimates capital gains tax on mutual fund redemption under the current framework post Budget 2024 and the
+          Section 50AA "specified mutual fund" narrowing effective FY2025-26. For debt-oriented and hybrid/other
+          categories, the applicable rule (indexed vs. non-indexed) is derived automatically from your purchase and
+          redemption dates.
+          <span style="color:var(--danger);">This is an estimate for planning purposes only — not tax advice. Verify slab, cess, surcharge and category classification with a qualified CA before filing.</span>
+        </div>
+
+        <div class="input-row" style="align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+          <div class="input-group" style="min-width:280px;">
+            <label class="input-label">Fund Tax Category</label>
+            <select class="input-field" id="taxCategory" onchange="onTaxCategoryChange()" style="width:100%;">
+              <option value="equity">Equity-oriented (≥65% equity) — incl. Arbitrage, Equity Savings, Aggressive Hybrid/BAF</option>
+              <option value="debtspecified">Debt-oriented Specified Fund (&gt;65% debt &amp; money market instruments)</option>
+              <option value="hybridother">Hybrid / Other (35–65% equity) — incl. Gold, International FoFs</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="input-row" style="align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+          <div class="input-group">
+            <label class="input-label">Purchase Date</label>
+            <input class="input-field" type="date" id="taxPurchaseDate" style="width:160px;">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Redemption Date</label>
+            <input class="input-field" type="date" id="taxRedemptionDate" style="width:160px;">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Purchase Value (₹)</label>
+            <input class="input-field" type="number" id="taxPurchaseValue" placeholder="e.g. 100000" style="width:150px;">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Redemption Value (₹)</label>
+            <input class="input-field" type="number" id="taxRedemptionValue" placeholder="e.g. 145000" style="width:150px;">
+          </div>
+        </div>
+
+        <div class="input-row" style="align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+          <div class="input-group" id="taxSlabGroup" style="display:none;">
+            <label class="input-label">Your Marginal Tax Slab (%)</label>
+            <input class="input-field" type="number" id="taxSlabRate" value="30" min="0" max="42.74" step="0.1" style="width:130px;">
+          </div>
+          <div class="input-group" id="taxExemptionGroup">
+            <label class="input-label">LTCG Exemption Already Used This FY (₹)</label>
+            <input class="input-field" type="number" id="taxExemptionUsed" value="0" min="0" style="width:190px;">
+          </div>
+          <div class="input-group" id="taxCiiPurchaseGroup" style="display:none;">
+            <label class="input-label">CII — Purchase FY (if pre-23-Jul-2024 rules apply)</label>
+            <input class="input-field" type="number" id="taxCiiPurchase" placeholder="auto" style="width:110px;">
+          </div>
+          <div class="input-group" id="taxCiiRedemptionGroup" style="display:none;">
+            <label class="input-label">CII — Redemption FY (if applicable)</label>
+            <input class="input-field" type="number" id="taxCiiRedemption" placeholder="verify latest" style="width:130px;">
+          </div>
+          <div class="input-group" style="padding-top:18px;">
+            <button class="btn btn-primary" onclick="calcRedemptionTax()">Estimate Tax</button>
+          </div>
+        </div>
+
+        <div id="taxCalcResult"></div>
+      </div>
+    </div>
+
     <!-- OVERLAP ANALYZER PAGE -->
     <div class="page" id="page-overlap">
       <div class="section-title">Fund Overlap Analyzer</div>
@@ -2254,6 +2324,118 @@ async function getNav(schemeCode) {
   return data;
 }
 
+// ─── NAV ANOMALY DETECTION ──────────────────────────────────
+// Flags implausible day-over-day NAV moves (wrong scheme code, stale/misprinted
+// NAV, decimal-shift feed errors) using a robust MAD-based outlier test rather
+// than plain standard deviation, since SD itself gets skewed by the very
+// outliers we're trying to catch. Threshold ≈ 5 SD equivalent (K = 5 / 0.6745
+// ≈ 7.4×MAD under a normal approximation) — loose enough to not fire on normal
+// fat-tailed fund volatility (smallcap/sectoral/single-stock-heavy categories),
+// but tight enough that genuine data errors (which tend to be an order of
+// magnitude off) still get caught. Advisory only — never filters or corrects
+// the NAV array used in any calculation.
+const NAV_ANOMALY_K = 7.4;
+// ─── PNG CAPTURE WIDTH FIX ────────────────────────────────
+// html2canvas only captures the visibly-clipped viewport width of a
+// scrollable table wrapper (`body` has overflow-x:hidden, and individual
+// table wrappers use overflow:auto — either via the shared .compare-table-wrap
+// class, or, on some pages like CSR, an ancestor with an inline overflow-x
+// style), so anything scrolled out of view — extra columns, long fund names —
+// gets silently cut off in the exported image. This widens every such
+// scrollable wrapper both among `el`'s ancestors and its descendants to their
+// full scrollWidth before capture, and returns a function that restores the
+// original styles afterward.
+function _widenForCapture(el) {
+  const saved = [];
+  const widen = (target) => {
+    if (saved.some(s => s.el === target)) return;
+    saved.push({ el: target, overflow: target.style.overflow, overflowX: target.style.overflowX, width: target.style.width });
+    target.style.overflow = 'visible';
+    target.style.width = target.scrollWidth + 'px';
+  };
+  // Walk up a few levels for scrollable ancestors (e.g. CSR's #csr-snapshot-wrap,
+  // which uses an inline overflow-x:auto style rather than the shared class).
+  let node = el.parentElement, hops = 0;
+  while (node && hops < 6) {
+    const cs = getComputedStyle(node);
+    if (cs.overflowX === 'auto' || cs.overflowX === 'scroll' || cs.overflow === 'auto' || cs.overflow === 'scroll') widen(node);
+    node = node.parentElement;
+    hops++;
+  }
+  // Widen any scrollable descendants too (e.g. .compare-table-wrap from resultsTable()).
+  el.querySelectorAll('.compare-table-wrap').forEach(widen);
+
+  const bodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'visible';
+  return function restore() {
+    saved.forEach(({el, overflow, overflowX, width}) => { el.style.overflow = overflow; el.style.overflowX = overflowX; el.style.width = width; });
+    document.body.style.overflow = bodyOverflow;
+  };
+}
+
+function computeNavAnomalies(navArr, schemeName = '') {
+  if (!Array.isArray(navArr) || navArr.length < 30) return [];
+  const nameL = (schemeName || '').toLowerCase();
+  const isIDCW = nameL.includes('idcw') || nameL.includes('dividend');
+
+  const rets = [];
+  for (let i = 1; i < navArr.length; i++) {
+    const prev = navArr[i - 1].nav, cur = navArr[i].nav;
+    if (!prev || !cur || prev <= 0 || cur <= 0) continue;
+    rets.push({ i, ret: (cur - prev) / prev });
+  }
+  if (rets.length < 20) return [];
+
+  const sortedRets = rets.map(r => r.ret).slice().sort((a, b) => a - b);
+  const median = sortedRets[Math.floor(sortedRets.length / 2)];
+  const absDevs = sortedRets.map(v => Math.abs(v - median)).sort((a, b) => a - b);
+  const mad = absDevs[Math.floor(absDevs.length / 2)];
+  if (!mad) return []; // no variance (e.g. a handful of points) — nothing to test against
+
+  const anomalies = [];
+  for (const r of rets) {
+    const z = Math.abs(r.ret - median) / mad;
+    if (z <= NAV_ANOMALY_K) continue;
+    // IDCW/Dividend plans legitimately drop NAV sharply on record date — don't
+    // flag a large negative move for those, only unexplained positive jumps.
+    if (isIDCW && r.ret < 0) continue;
+    anomalies.push({
+      date: navArr[r.i].date,
+      prevDate: navArr[r.i - 1].date,
+      nav: navArr[r.i].nav,
+      prevNav: navArr[r.i - 1].nav,
+      retPct: r.ret * 100,
+      z
+    });
+  }
+  return anomalies;
+}
+
+// Renders a compact dismissible warning banner HTML string for any detected
+// anomalies within navArr (or [] if none / not enough data — caller should
+// only insert this when the returned string is non-empty).
+function navAnomalyBannerHTML(anomalies, contextId) {
+  if (!anomalies || !anomalies.length) return '';
+  const rows = anomalies.slice(0, 5).map(a => {
+    const d = a.date instanceof Date ? a.date.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '';
+    const sign = a.retPct >= 0 ? '+' : '';
+    return `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;">
+      <span style="color:var(--text3);">${d}</span>
+      <span style="color:${a.retPct>=0?'var(--positive)':'var(--danger)'};font-weight:600;">${sign}${a.retPct.toFixed(1)}%</span>
+      <span style="color:var(--text3);">(₹${a.prevNav.toFixed(2)} → ₹${a.nav.toFixed(2)})</span>
+    </div>`;
+  }).join('');
+  const more = anomalies.length > 5 ? `<div style="color:var(--text3);margin-top:2px;">+ ${anomalies.length - 5} more</div>` : '';
+  const id = 'navanom-' + (contextId || Math.random().toString(36).slice(2,7));
+  return `<div id="${id}" class="anomaly-banner" style="background:rgba(240,92,120,0.07);border:1px solid rgba(240,92,120,0.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-family:var(--mono);font-size:11px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:var(--danger);font-weight:700;">⚠ Unusual NAV move${anomalies.length>1?'s':''} detected — verify before relying on this data</span>
+      <span onclick="document.getElementById('${id}').style.display='none'" style="cursor:pointer;color:var(--text3);padding:0 4px;">✕</span>
+    </div>
+    <div style="margin-top:6px;">${rows}${more}</div>
+  </div>`;
+}
+
 // ─── SEARCH ──────────────────────────────────────────────
 let searchTimer;
 
@@ -2347,6 +2529,7 @@ function renderFundPage(data) {
   const meta = data.meta;
   const navs = data.data; // [{date, nav}] newest first
   const navArr = navs.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) })).filter(n => !isNaN(n.nav)).reverse(); // oldest first
+  const navAnomalies = computeNavAnomalies(navArr, meta.scheme_name || selectedFund.schemeName);
 
   const ptpReturns = calcPTPReturns(navArr);
   // Reset bench states for new fund
@@ -2380,6 +2563,7 @@ function renderFundPage(data) {
   const metaKeys = Object.keys(meta||{});
 
   document.getElementById('fundContent').innerHTML = `
+    ${navAnomalyBannerHTML(navAnomalies, selectedFund.schemeCode)}
     <div class="fund-header-card">
       <div style="flex:1;">
         <div class="fund-title">${meta.scheme_name || selectedFund.schemeName}</div>
@@ -2821,6 +3005,7 @@ function calcSIPYearly(navArr) {
     const cashflows = buildSIPCashflows(navArr, startDate, latest.date, 10000);
     if (cashflows.length < 3) continue;
     const xirr = calcXIRR(cashflows);
+    if (!isFinite(xirr)) continue;
     const invested = cashflows.filter(c => c.amount < 0).length * 10000;
     const worth = cashflows[cashflows.length - 1].amount;
     const lastNav = latest.nav;
@@ -3806,7 +3991,7 @@ window.exportSnapshotPNG = async function(wrapId, filename) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) { showToast('No results to export', 'error'); return; }
 
-  const bars = wrap.querySelectorAll('.export-bar');
+  const bars = wrap.querySelectorAll('.export-bar, .anomaly-banner');
   bars.forEach(b => b.style.display = 'none');
 
   const header = document.createElement('div');
@@ -3829,8 +4014,9 @@ window.exportSnapshotPNG = async function(wrapId, filename) {
   wrap.appendChild(disc);
 
   showToast('Capturing…', '');
+  const restoreWidth = _widenForCapture(wrap);
   try {
-    const canvas = await html2canvas(wrap, { backgroundColor: '#0d1117', scale: 2, useCORS: true, logging: false });
+    const canvas = await html2canvas(wrap, { backgroundColor: '#0d1117', scale: 2, useCORS: true, logging: false, windowWidth: wrap.scrollWidth });
     const link = document.createElement('a');
     link.download = (filename || 'MF_Research_Export') + '_' + new Date().toISOString().split('T')[0] + '.png';
     link.href = canvas.toDataURL('image/png');
@@ -3843,6 +4029,7 @@ window.exportSnapshotPNG = async function(wrapId, filename) {
     wrap.querySelector('.png-export-footer')?.remove();
     wrap.querySelector('.png-export-disc')?.remove();
     bars.forEach(b => b.style.display = '');
+    restoreWidth();
   }
 };
 
@@ -3905,22 +4092,24 @@ window.calcSIP = async function() {
   try {
     const startD = new Date(startStr), endD = new Date(endStr);
     const bench = await loadBenchmark(benchCode, startD, endD, amt, 'sip');
+    const benchAnomalies = bench ? computeNavAnomalies(bench.navArr.filter(n=>n.date>=startD&&n.date<=endD), bench.name) : [];
     const results = [];
     for (const slot of validSlots) {
       try {
         const fData = await getNav(slot.code);
         const navArr = fData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
+        const anomalies = computeNavAnomalies(navArr.filter(n=>n.date>=startD&&n.date<=endD), slot.name);
         const cf = buildSIPCashflows(navArr, startD, endD, amt, frequency);
         const xirr = calcXIRR(cf);
         const invested = cf.filter(c=>c.amount<0).length * amt;
         const finalVal = cf[cf.length-1].amount;
         const gain = finalVal - invested;
         const alpha = bench ? xirr - bench.xirr : null;
-        results.push({name:slot.name,code:slot.code,xirr,invested,finalVal,gain,alpha,installments:cf.length-1,cf,ok:true});
+        results.push({name:slot.name,code:slot.code,xirr,invested,finalVal,gain,alpha,installments:cf.length-1,cf,anomalies,ok:true});
       } catch(e) { results.push({name:slot.name,code:slot.code,ok:false,error:e.message}); }
     }
     results.sort((a,b)=>(b.xirr||0)-(a.xirr||0));
-    const okR = results.filter(r=>r.ok);
+    const okR = results.filter(r=>r.ok && isFinite(r.xirr));
     const bestXirr = okR.length ? Math.max(...okR.map(r=>r.xirr)) : 0;
     const worstXirr = okR.length ? Math.min(...okR.map(r=>r.xirr)) : 0;
     const freqLabel = freqLabels[frequency] || frequency;
@@ -3930,6 +4119,32 @@ window.calcSIP = async function() {
       {label:'Best XIRR 🥇', value:`${bestXirr.toFixed(2)}%`, sub:okR.find(r=>r.xirr===bestXirr)?.name?.substring(0,35)||'', color:'var(--positive)'},
       {label:'Worst XIRR', value:`${worstXirr.toFixed(2)}%`, sub:okR.find(r=>r.xirr===worstXirr)?.name?.substring(0,35)||'', color: worstXirr<0?'var(--danger)':'var(--warn)'},
     ]);
+    // Combine any per-fund + benchmark anomalies into one banner above the results.
+    const allAnomFlags = [
+      ...(benchAnomalies.length ? [{name: bench.name, anomalies: benchAnomalies}] : []),
+      ...okR.filter(r => r.anomalies && r.anomalies.length).map(r => ({name: r.name, anomalies: r.anomalies}))
+    ];
+    let anomalyBanner = '';
+    if (allAnomFlags.length) {
+      const flatAnoms = allAnomFlags.flatMap(f => f.anomalies.map(a => ({...a, fund: f.name})));
+      const rows = flatAnoms.slice(0, 6).map(a => {
+        const d = a.date instanceof Date ? a.date.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '';
+        const sign = a.retPct >= 0 ? '+' : '';
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;">
+          <span style="color:var(--text3);">${a.fund.substring(0,26)} · ${d}</span>
+          <span style="color:${a.retPct>=0?'var(--positive)':'var(--danger)'};font-weight:600;">${sign}${a.retPct.toFixed(1)}%</span>
+        </div>`;
+      }).join('');
+      const more = flatAnoms.length > 6 ? `<div style="color:var(--text3);margin-top:2px;">+ ${flatAnoms.length - 6} more</div>` : '';
+      const bannerId = 'sipcalc-anom-banner';
+      anomalyBanner = `<div id="${bannerId}" class="anomaly-banner" style="background:rgba(240,92,120,0.07);border:1px solid rgba(240,92,120,0.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-family:var(--mono);font-size:11px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:var(--danger);font-weight:700;">⚠ Unusual NAV move${flatAnoms.length>1?'s':''} detected in this date range — verify before relying on this result</span>
+          <span onclick="document.getElementById('${bannerId}').style.display='none'" style="cursor:pointer;color:var(--text3);padding:0 4px;">✕</span>
+        </div>
+        <div style="margin-top:6px;">${rows}${more}</div>
+      </div>`;
+    }
     window._sipCalcCF = {};
     window._sipCalcBenchCF = bench ? bench.cf : null;
     window._sipCalcBenchName = bench ? bench.name : null;
@@ -3969,7 +4184,7 @@ window.calcSIP = async function() {
       /<button class="btn-export btn-export-png"[^>]*>⬇ PNG<\/button>/,
       '<button class="btn-export btn-export-png" onclick="window.sipCalcExportPNG()">⬇ PNG</button>'
     );
-    resultEl.innerHTML = `<div id="sipcalc-snapshot">${summary}${tableHTMLWithPng}</div>`;
+    resultEl.innerHTML = `<div id="sipcalc-snapshot">${anomalyBanner}${summary}${tableHTMLWithPng}</div>`;
     window._sipCalcSnapshotMeta = `${freqLabel} SIP · ₹${amt.toLocaleString('en-IN')} · ${startStr} → ${endStr}${bench ? ' · vs ' + bench.name : ''}`;
     window._sipCalcSnapshotFile = `SIP-Comparison_${new Date().toISOString().split('T')[0]}`;
   } catch(e) { resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:12px;padding:12px;">${e.message}</div>`; }
@@ -3979,7 +4194,7 @@ window.sipCalcExportPNG = async function() {
   const wrap = document.getElementById('sipcalc-snapshot');
   if (!wrap) { showToast('No results to export', 'error'); return; }
 
-  const bars = wrap.querySelectorAll('.export-bar');
+  const bars = wrap.querySelectorAll('.export-bar, .anomaly-banner');
   bars.forEach(b => b.style.display = 'none');
 
   // Add a branded header temporarily for the export
@@ -4006,12 +4221,14 @@ window.sipCalcExportPNG = async function() {
   wrap.appendChild(disc);
 
   showToast('Capturing…', '');
+  const restoreWidth = _widenForCapture(wrap);
   try {
     const canvas = await html2canvas(wrap, {
       backgroundColor: '#0d1117',
       scale: 2,
       useCORS: true,
       logging: false,
+      windowWidth: wrap.scrollWidth,
     });
     const link = document.createElement('a');
     link.download = (window._sipCalcSnapshotFile || 'SIP-Comparison') + '.png';
@@ -4025,6 +4242,7 @@ window.sipCalcExportPNG = async function() {
     document.getElementById('sipcalc-png-footer')?.remove();
     document.getElementById('sipcalc-png-disc')?.remove();
     bars.forEach(b => b.style.display = '');
+    restoreWidth();
   }
 };
 
@@ -4042,11 +4260,13 @@ window.calcPTPMulti = async function() {
   try {
     const fromD = new Date(fromStr), toD = new Date(toStr);
     const bench = await loadBenchmark(benchCode, fromD, toD, 0, 'ptp');
+    const benchAnomalies = bench ? computeNavAnomalies(bench.navArr.filter(n=>n.date>=fromD&&n.date<=toD), bench.name) : [];
     const results = [];
     for (const slot of validSlots) {
       try {
         const fData = await getNav(slot.code);
         const navArr = fData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
+        const anomalies = computeNavAnomalies(navArr.filter(n=>n.date>=fromD&&n.date<=toD), slot.name);
         const sn = closestNav(navArr, fromD);
         const en = closestNav(navArr, toD);
         if (!sn||!en) throw new Error('No NAV data for range');
@@ -4056,7 +4276,7 @@ window.calcPTPMulti = async function() {
         const worth = lumpsum*(en.nav/sn.nav);
         const gain = worth - lumpsum;
         const alpha = bench ? cagr - bench.cagr : null;
-        results.push({name:slot.name,code:slot.code,cagr,abs,years,worth,gain,alpha,startNav:sn.nav,endNav:en.nav,ok:true});
+        results.push({name:slot.name,code:slot.code,cagr,abs,years,worth,gain,alpha,startNav:sn.nav,endNav:en.nav,anomalies,ok:true});
       } catch(e) { results.push({name:slot.name,code:slot.code,ok:false,error:e.message}); }
     }
     results.sort((a,b)=>(b.cagr||0)-(a.cagr||0));
@@ -4096,7 +4316,30 @@ window.calcPTPMulti = async function() {
       </tr>`;
     }).join('');
     const cols = [{label:'Fund',left:true,nosort:true},{label:'CAGR'},{label:'Abs Return'},{label:'Invested'},{label:'Final Value'},{label:'Gain/Loss'},{label:'NAV Range',nosort:true},...(bench?[{label:'Alpha'}]:[])];
-    resultEl.innerHTML = summary + resultsTable(cols, tableRows, '* Sorted by CAGR desc · CAGR for periods ≥1Y, Abs return for <1Y');
+    const allAnomFlags = [
+      ...(benchAnomalies.length ? benchAnomalies.map(a=>({...a,fund:bench.name})) : []),
+      ...okR.filter(r=>r.anomalies&&r.anomalies.length).flatMap(r=>r.anomalies.map(a=>({...a,fund:r.name})))
+    ];
+    let ptpAnomalyBanner = '';
+    if (allAnomFlags.length) {
+      const rows = allAnomFlags.slice(0,6).map(a => {
+        const d = a.date instanceof Date ? a.date.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '';
+        const sign = a.retPct >= 0 ? '+' : '';
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;">
+          <span style="color:var(--text3);">${a.fund.substring(0,26)} · ${d}</span>
+          <span style="color:${a.retPct>=0?'var(--positive)':'var(--danger)'};font-weight:600;">${sign}${a.retPct.toFixed(1)}%</span>
+        </div>`;
+      }).join('');
+      const more = allAnomFlags.length > 6 ? `<div style="color:var(--text3);margin-top:2px;">+ ${allAnomFlags.length - 6} more</div>` : '';
+      ptpAnomalyBanner = `<div id="ptpcalc-anom-banner" class="anomaly-banner" style="background:rgba(240,92,120,0.07);border:1px solid rgba(240,92,120,0.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-family:var(--mono);font-size:11px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:var(--danger);font-weight:700;">⚠ Unusual NAV move${allAnomFlags.length>1?'s':''} detected in this date range — verify before relying on this result</span>
+          <span onclick="document.getElementById('ptpcalc-anom-banner').style.display='none'" style="cursor:pointer;color:var(--text3);padding:0 4px;">✕</span>
+        </div>
+        <div style="margin-top:6px;">${rows}${more}</div>
+      </div>`;
+    }
+    resultEl.innerHTML = ptpAnomalyBanner + summary + resultsTable(cols, tableRows, '* Sorted by CAGR desc · CAGR for periods ≥1Y, Abs return for <1Y');
   } catch(e) { resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:12px;padding:12px;">${e.message}</div>`; }
 }
 
@@ -4707,7 +4950,7 @@ window.calcRollingMulti = async function() {
 window.switchPage = function(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${page}`)?.classList.add('active');
-  const pages = ['fund','compare','sipcalc','ptpcalc','rollingcalc','stepupcalc','swpcalc','chartcmp','catscanner','lumpsip','goalcalc','corrmatrix','fundmgr','catheatmap','isinlookup','navdl'];
+  const pages = ['fund','compare','sipcalc','ptpcalc','rollingcalc','stepupcalc','swpcalc','chartcmp','catscanner','lumpsip','goalcalc','corrmatrix','fundmgr','catheatmap','isinlookup','navdl','taxcalc'];
   document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', pages[i] === page));
   updateBottomNav(page);
   updateDrawerNav(page);
@@ -4717,6 +4960,11 @@ window.switchPage = function(page) {
     const t = new Date(), y = new Date(t); y.setFullYear(t.getFullYear()-1);
     document.getElementById('ptpFrom').value = y.toISOString().split('T')[0];
     document.getElementById('ptpTo').value = t.toISOString().split('T')[0];
+  }
+  if (page === 'taxcalc' && !document.getElementById('taxRedemptionDate').value) {
+    const t = new Date(), p = new Date(t); p.setFullYear(t.getFullYear()-2);
+    document.getElementById('taxPurchaseDate').value = p.toISOString().split('T')[0];
+    document.getElementById('taxRedemptionDate').value = t.toISOString().split('T')[0];
   }
 }
 
@@ -5063,7 +5311,7 @@ window.calcStepUpSIP = async function() {
     }
 
     results.sort((a,b) => (b.stepXIRR||0) - (a.stepXIRR||0));
-    const okR = results.filter(r=>r.ok);
+    const okR = results.filter(r=>r.ok && isFinite(r.stepXIRR) && isFinite(r.flatXIRR));
     const bestXIRR = okR.length ? Math.max(...okR.map(r=>r.stepXIRR)) : 0;
 
     const fmtV = v => { const a=Math.abs(v); return a>=10000000?`₹${(v/10000000).toFixed(2)}Cr`:a>=100000?`₹${(v/100000).toFixed(2)}L`:`₹${(v/1000).toFixed(1)}K`; };
@@ -5908,7 +6156,7 @@ window.calcLumpSIP = async function() {
   }
 
   results.sort((a,b) => (b.xirr||0) - (a.xirr||0));
-  const okR = results.filter(r => r.ok);
+  const okR = results.filter(r => r.ok && isFinite(r.xirr));
   const best = okR.length ? Math.max(...okR.map(r=>r.xirr)) : 0;
   const totalLumps  = activeLumps.reduce((s,e)=>s+e.amount,0);
   const fmtDate = d => d instanceof Date ? d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : d;
@@ -6148,6 +6396,202 @@ window.calcGoal = function() {
       </table>
     </div>
     <div style="font-size:9.5px;color:var(--text3);font-family:var(--mono);margin-top:8px;">* Wealth Gain = Target Corpus − Total Invested (flat SIP) · Gain Ratio = Wealth Gain ÷ Total Invested</div>`;
+}
+
+// ─── REDEMPTION TAX ESTIMATOR ────────────────────────────
+// Cost Inflation Index — CBDT-notified, base year 2001-02 = 100. These are
+// historical published figures (stable, non-controversial) through FY2023-24.
+// FY2024-25 onward is intentionally left for the user to enter/verify, since
+// this tool has no live data source to confirm the latest notified figure.
+const CII_TABLE = {
+  '2001-02':100,'2002-03':105,'2003-04':109,'2004-05':113,'2005-06':117,
+  '2006-07':122,'2007-08':129,'2008-09':137,'2009-10':148,'2010-11':167,
+  '2011-12':184,'2012-13':200,'2013-14':220,'2014-15':240,'2015-16':254,
+  '2016-17':264,'2017-18':272,'2018-19':280,'2019-20':289,'2020-21':301,
+  '2021-22':317,'2022-23':331,'2023-24':348
+};
+function fyFromDate(d) {
+  // Indian FY: Apr 1 – Mar 31
+  const y = d.getFullYear(), m = d.getMonth(); // 0-indexed, Apr = 3
+  const startYr = m >= 3 ? y : y - 1;
+  return `${startYr}-${String((startYr+1)%100).padStart(2,'0')}`;
+}
+
+window.onTaxCategoryChange = function() {
+  const cat = document.getElementById('taxCategory').value;
+  const showSlabAndCii = (cat === 'debtspecified' || cat === 'hybridother');
+  document.getElementById('taxSlabGroup').style.display = showSlabAndCii ? '' : 'none';
+  document.getElementById('taxExemptionGroup').style.display = (cat === 'equity') ? '' : 'none';
+  document.getElementById('taxCiiPurchaseGroup').style.display = showSlabAndCii ? '' : 'none';
+  document.getElementById('taxCiiRedemptionGroup').style.display = showSlabAndCii ? '' : 'none';
+}
+
+window.calcRedemptionTax = function() {
+  const resultEl = document.getElementById('taxCalcResult');
+  const cat = document.getElementById('taxCategory').value;
+  const pDateStr = document.getElementById('taxPurchaseDate').value;
+  const rDateStr = document.getElementById('taxRedemptionDate').value;
+  const pVal = parseFloat(document.getElementById('taxPurchaseValue').value);
+  const rVal = parseFloat(document.getElementById('taxRedemptionValue').value);
+
+  if (!pDateStr || !rDateStr || !pVal || !rVal) {
+    resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:12px;padding:12px;">Please fill in purchase/redemption dates and values.</div>`;
+    return;
+  }
+  const pDate = new Date(pDateStr), rDate = new Date(rDateStr);
+  if (rDate <= pDate) {
+    resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:12px;padding:12px;">Redemption date must be after purchase date.</div>`;
+    return;
+  }
+  const holdingDays = Math.round((rDate - pDate) / 86400000);
+  const holdingMonths = holdingDays / 30.44;
+  const holdingYears = holdingDays / 365.25;
+  const gain = rVal - pVal;
+
+  const fmt = v => '₹' + v.toLocaleString('en-IN', {maximumFractionDigits: 0});
+  const CESS = 0.04; // Health & Education Cess — stable, standard across regimes
+  const RULE_CHANGE_DATE = new Date('2024-07-23');   // Budget 2024 — new rates/indexation removal effective this date
+  const APR_2023 = new Date('2023-04-01');            // Section 50AA specified-fund cutoff
+
+  let regime, isLTCG, taxableGain, rate, taxBeforeCess, note = '', indexedCost = null;
+
+  if (cat === 'equity') {
+    // Equity-oriented fund: ≥65% equity, incl. arbitrage/equity-savings/aggressive-hybrid (BAF)
+    // (gross equity exposure basis). Budget 2024 rates, effective 23-Jul-2024 — unchanged since.
+    isLTCG = holdingMonths >= 12;
+    regime = isLTCG ? 'LTCG (Equity-oriented)' : 'STCG (Equity-oriented)';
+    if (isLTCG) {
+      const exemptionUsed = parseFloat(document.getElementById('taxExemptionUsed').value) || 0;
+      const remainingExemption = Math.max(125000 - exemptionUsed, 0);
+      taxableGain = Math.max(gain - remainingExemption, 0);
+      rate = 0.125;
+      note = `₹1,25,000 annual LTCG exemption (₹${remainingExemption.toLocaleString('en-IN')} available after ₹${exemptionUsed.toLocaleString('en-IN')} already used this FY) applied before tax.`;
+    } else {
+      taxableGain = Math.max(gain, 0);
+      rate = 0.20;
+      note = 'Held under 12 months — taxed as STCG at flat 20%, no exemption available.';
+    }
+    taxBeforeCess = taxableGain * rate;
+
+  } else if (cat === 'debtspecified') {
+    // Debt-oriented Specified Mutual Fund under Sec 50AA (>65% debt & money market
+    // instruments — definition narrowed to this from FY2025-26; previously ≤35% equity).
+    const slab = parseFloat(document.getElementById('taxSlabRate').value) / 100 || 0;
+    if (pDate >= APR_2023) {
+      // Units acquired on/after 1-Apr-2023: always deemed STCG at slab rate, any holding period.
+      isLTCG = false;
+      regime = 'Deemed STCG (Specified Fund, bought on/after 1-Apr-2023)';
+      taxableGain = Math.max(gain, 0);
+      rate = slab;
+      note = 'Units bought on/after 1-Apr-2023 in a debt-oriented specified fund are always taxed at slab rate — no LTCG concept applies, regardless of holding period.';
+      taxBeforeCess = taxableGain * rate;
+    } else if (rDate < RULE_CHANGE_DATE) {
+      // Bought before 1-Apr-2023 AND redeemed before 23-Jul-2024 — old grandfathered rules.
+      isLTCG = holdingMonths >= 36;
+      regime = isLTCG ? 'LTCG (pre-23-Jul-2024, indexed)' : 'STCG (pre-23-Jul-2024, slab rate)';
+      if (isLTCG) {
+        const ciiP = parseFloat(document.getElementById('taxCiiPurchase').value) || CII_TABLE[fyFromDate(pDate)];
+        const ciiR = parseFloat(document.getElementById('taxCiiRedemption').value) || CII_TABLE[fyFromDate(rDate)];
+        if (!ciiP || !ciiR) {
+          resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:12px;padding:12px;">Please enter CII for both purchase and redemption FY — verify the CBDT-notified figure for this period.</div>`;
+          return;
+        }
+        indexedCost = pVal * (ciiR / ciiP);
+        taxableGain = Math.max(rVal - indexedCost, 0);
+        rate = 0.20;
+        note = `Redeemed before the 23-Jul-2024 rule change — old grandfathered treatment applies. Indexed cost = ₹${pVal.toLocaleString('en-IN')} × (CII ${ciiR} ÷ CII ${ciiP}) = ${fmt(indexedCost)}, taxed at 20%.`;
+      } else {
+        taxableGain = Math.max(gain, 0);
+        rate = slab;
+        note = 'Held under 36 months at time of this (pre-23-Jul-2024) redemption — taxed as STCG at slab rate.';
+      }
+      taxBeforeCess = taxableGain * rate;
+    } else {
+      // Bought before 1-Apr-2023 but redeemed on/after 23-Jul-2024 — the old indexation
+      // grandfathering has ended; this now follows the new 24-month/12.5%-flat rule.
+      isLTCG = holdingMonths >= 24;
+      regime = isLTCG ? 'LTCG (post-23-Jul-2024, no indexation)' : 'STCG (slab rate)';
+      taxableGain = Math.max(gain, 0);
+      rate = isLTCG ? 0.125 : slab;
+      note = isLTCG
+        ? 'Bought before 1-Apr-2023 but redeemed on/after 23-Jul-2024 — the old 20%-with-indexation grandfathering no longer applies. Taxed at flat 12.5%, no indexation, since held ≥24 months.'
+        : 'Held under 24 months at time of this (post-23-Jul-2024) redemption — taxed as STCG at slab rate.';
+      taxBeforeCess = taxableGain * rate;
+    }
+
+  } else {
+    // Hybrid / Other — 35–65% equity (also gold/international FoFs post FY2025-26 narrowing).
+    // Not covered by Section 50AA, so purchase-date relative to 1-Apr-2023 is irrelevant here —
+    // only the redemption date relative to the 23-Jul-2024 rule change matters.
+    const slab = parseFloat(document.getElementById('taxSlabRate').value) / 100 || 0;
+    if (rDate < RULE_CHANGE_DATE) {
+      isLTCG = holdingMonths >= 36;
+      regime = isLTCG ? 'LTCG (pre-23-Jul-2024, indexed)' : 'STCG (pre-23-Jul-2024, slab rate)';
+      if (isLTCG) {
+        const ciiP = parseFloat(document.getElementById('taxCiiPurchase').value) || CII_TABLE[fyFromDate(pDate)];
+        const ciiR = parseFloat(document.getElementById('taxCiiRedemption').value) || CII_TABLE[fyFromDate(rDate)];
+        if (!ciiP || !ciiR) {
+          resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:12px;padding:12px;">Please enter CII for both purchase and redemption FY — verify the CBDT-notified figure for this period.</div>`;
+          return;
+        }
+        indexedCost = pVal * (ciiR / ciiP);
+        taxableGain = Math.max(rVal - indexedCost, 0);
+        rate = 0.20;
+        note = `Redeemed before the 23-Jul-2024 rule change — old general capital asset treatment applies. Indexed cost = ₹${pVal.toLocaleString('en-IN')} × (CII ${ciiR} ÷ CII ${ciiP}) = ${fmt(indexedCost)}, taxed at 20%.`;
+      } else {
+        taxableGain = Math.max(gain, 0);
+        rate = slab;
+        note = 'Held under 36 months at time of this (pre-23-Jul-2024) redemption — taxed as STCG at slab rate.';
+      }
+      taxBeforeCess = taxableGain * rate;
+    } else {
+      isLTCG = holdingMonths >= 24;
+      regime = isLTCG ? 'LTCG (Hybrid/Other, no indexation)' : 'STCG (Hybrid/Other, slab rate)';
+      taxableGain = Math.max(gain, 0);
+      rate = isLTCG ? 0.125 : slab;
+      note = isLTCG
+        ? 'Held ≥24 months — taxed at flat 12.5%, no indexation available, no annual exemption (unlike equity-oriented funds).'
+        : 'Held under 24 months — taxed as STCG at your marginal slab rate.';
+      taxBeforeCess = taxableGain * rate;
+    }
+  }
+
+  const cess = taxBeforeCess * CESS;
+  const totalTax = taxBeforeCess + cess;
+  const postTaxValue = rVal - totalTax;
+  const effectivePostTaxGain = postTaxValue - pVal;
+  const absReturn = (gain / pVal) * 100;
+  const postTaxAbsReturn = (effectivePostTaxGain / pVal) * 100;
+
+  const boxes = [
+    {label:'Holding Period', value:`${holdingYears.toFixed(1)}Y`, sub:`${holdingDays} days`, color:'var(--text)'},
+    {label:'Capital Gain', value:fmt(gain), sub:`${absReturn.toFixed(1)}% abs.`, color: gain>=0?'var(--positive)':'var(--danger)'},
+    {label:'Regime Applied', value:regime, sub:`Rate: ${(rate*100).toFixed(2)}%`, color:'var(--accent)'},
+    {label:'Total Tax (incl. 4% cess)', value:fmt(totalTax), sub:`${gain>0?((totalTax/gain)*100).toFixed(1):'0'}% of gain`, color:'var(--danger)'},
+    {label:'Post-Tax Value', value:fmt(postTaxValue), sub:`${postTaxAbsReturn.toFixed(1)}% post-tax abs. return`, color:'var(--positive)'},
+  ];
+
+  resultEl.innerHTML = `
+    <div id="taxcalc-snapshot">
+    <div class="summary-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0;">
+      ${boxes.map(b => `
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px 14px;">
+          <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">${b.label}</div>
+          <div style="font-size:17px;font-weight:700;color:${b.color};font-family:var(--mono);">${b.value}</div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px;">${b.sub}</div>
+        </div>`).join('')}
+    </div>
+    <div style="background:rgba(232,170,46,0.06);border:1px solid rgba(232,170,46,0.25);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:10px;">
+      ${note}${indexedCost ? `<br>Indexed cost basis: ${fmt(indexedCost)} (vs original ${fmt(pVal)})` : ''}
+    </div>
+    <div style="font-size:10px;color:var(--danger);font-family:var(--mono);line-height:1.6;">
+      ⚠ Estimate only — does not account for surcharge, other income, TDS, or fund-specific equity allocation verification. Confirm with a qualified CA before relying on this for filing.
+    </div>
+    <div class="export-bar" style="margin-top:14px;">
+      <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
+      <button class="btn-export btn-export-png" onclick="exportSnapshotPNG('taxcalc-snapshot','Redemption_Tax_Estimate')">⬇ PNG</button>
+    </div>
+    </div>`;
 }
 
 // ─── OVERLAP ANALYZER ────────────────────────────────────
@@ -7444,15 +7888,30 @@ function calcXIRR(cashflows) {
   }
 
   let rate = 0.1;
+  let converged = false;
   for (let iter = 0; iter < 100; iter++) {
     const f = npv(rate);
     const df = dnpv(rate);
     if (Math.abs(df) < 1e-12) break;
-    const newRate = rate - f / df;
-    if (Math.abs(newRate - rate) < 1e-8) { rate = newRate; break; }
+    let newRate = rate - f / df;
+    // Guard against runaway divergence. No real fund's XIRR gets anywhere near
+    // these bounds — clamping here stops Newton-Raphson blowing up into a
+    // garbage multi-billion-percent value on near-degenerate cash flow
+    // patterns (seen on very low-volatility funds like liquid/overnight,
+    // where the derivative is close to flat and the solver has little
+    // signal to work with).
+    if (newRate > 100) newRate = 100;
+    if (newRate < -0.99) newRate = -0.99;
+    if (Math.abs(newRate - rate) < 1e-8) { rate = newRate; converged = true; break; }
     rate = newRate;
-    if (rate < -0.99) rate = -0.99;
   }
+
+  // Confirm the result actually solves NPV ≈ 0. If Newton-Raphson never
+  // genuinely converged (e.g. got stuck oscillating near a clamp boundary),
+  // returning that number would be misleading — return NaN instead so
+  // callers (which already check isNaN/isFinite) exclude this fund rather
+  // than display a nonsense figure.
+  if (!converged || Math.abs(npv(rate)) > 1) return NaN;
   return rate * 100;
 }
 
@@ -8104,12 +8563,14 @@ window.csrExportPNG = async function() {
   wrap.appendChild(disc);
 
   showToast('Capturing…', '');
+  const restoreWidth = _widenForCapture(wrap);
   try {
     const canvas = await html2canvas(wrap, {
       backgroundColor: '#0d1117',
       scale: 2,
       useCORS: true,
       logging: false,
+      windowWidth: wrap.scrollWidth,
     });
     const link = document.createElement('a');
     link.download = (window._csrSnapshotFile || 'CSR-Snapshot') + '.png';
@@ -8122,6 +8583,7 @@ window.csrExportPNG = async function() {
     hdr.style.display = 'none';
     document.getElementById('csr-png-footer')?.remove();
     document.getElementById('csr-png-disc')?.remove();
+    restoreWidth();
   }
 };
 
