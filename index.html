@@ -2324,206 +2324,6 @@ async function getNav(schemeCode) {
   return data;
 }
 
-// ─── TER (TOTAL EXPENSE RATIO) LOOKUP ────────────────────────
-// mfapi.in has no TER data — only AMFI publishes it, and only via a JS-driven
-// page with no clean API. This uses a community-maintained daily mirror of
-// that AMFI disclosure as a plain CSV. Since it's an unofficial third-party
-// source (not an AMFI/SEBI API), every TER shown in the UI carries a visible
-// source + freshness note, and a confidence badge (exact vs. approximate name
-// match) — a wrong TER shown confidently is worse than an honest "not found",
-// so the fuzzy-match fallback is deliberately conservative: it requires the
-// AMC-identity token to match exactly plus ≥75% token overlap, not a loose
-// substring match, to avoid attributing one AMC's TER to a similarly-named
-// fund from a different AMC.
-// Multiple independent sources for the same file, tried in order. jsDelivr is
-// a general-purpose CDN (also used for npm/JS delivery), on different
-// infrastructure to raw.githubusercontent.com — networks that block GitHub
-// directly often still allow it through, since blocking it would break a lot
-// of unrelated websites. statically.io is a second independent mirror as a
-// last resort before falling back to stale cache.
-const TER_SOURCES = [
-  'https://raw.githubusercontent.com/captn3m0/india-mutual-fund-ter-tracker/main/data.csv',
-  'https://cdn.jsdelivr.net/gh/captn3m0/india-mutual-fund-ter-tracker@main/data.csv',
-  'https://cdn.statically.io/gh/captn3m0/india-mutual-fund-ter-tracker/main/data.csv',
-];
-const TER_CACHE_KEY = 'ved_ter_cache_v1';
-const TER_CACHE_HOURS = 24;
-const TER_FETCH_TIMEOUT_MS = 6000; // don't let one blocked/slow source hang the others
-let terData = null; // { byKey: {...}, list: [...], fetchedAt: number, stale?: boolean }
-
-function parseTERCSV(text) {
-  const rows = [];
-  let row = [], field = '', inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i], next = text[i + 1];
-    if (inQuotes) {
-      if (c === '"' && next === '"') { field += '"'; i++; }
-      else if (c === '"') { inQuotes = false; }
-      else field += c;
-    } else {
-      if (c === '"') inQuotes = true;
-      else if (c === ',') { row.push(field); field = ''; }
-      else if (c === '\n' || c === '\r') {
-        if (field !== '' || row.length) { row.push(field); rows.push(row); row = []; field = ''; }
-        if (c === '\r' && next === '\n') i++;
-      } else field += c;
-    }
-  }
-  if (field !== '' || row.length) { row.push(field); rows.push(row); }
-  return rows;
-}
-
-function terTokenize(name) {
-  return (name || '')
-    .toLowerCase()
-    .replace(/\(.*?\)/g, ' ')
-    .replace(/\b(direct|regular|growth|dividend|idcw|payout|reinvestment|plan|option|fund|fd)\b/g, ' ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-function terTokenOverlap(a, b) {
-  const aSet = new Set(a), bSet = new Set(b);
-  let common = 0;
-  aSet.forEach(t => { if (bSet.has(t)) common++; });
-  return common / (Math.min(aSet.size, bSet.size) || 1);
-}
-
-async function _fetchWithTimeout(url, ms) {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), ms);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.text();
-  } finally {
-    clearTimeout(t);
-  }
-}
-
-function _parseTERText(text) {
-  const rows = parseTERCSV(text);
-  const header = rows[0] || [];
-  const idx = {
-    name: header.indexOf('Scheme Name'),
-    regTotal: header.indexOf('Regular Plan - Total TER (%)'),
-    dirTotal: header.indexOf('Direct Plan - Total TER (%)'),
-  };
-  const byKey = {}, list = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    if (!r[idx.name]) continue;
-    const tokens = terTokenize(r[idx.name]);
-    const key = tokens.join('');
-    const entry = {
-      schemeName: r[idx.name],
-      regularTER: parseFloat(r[idx.regTotal]),
-      directTER: parseFloat(r[idx.dirTotal]),
-      tokens,
-    };
-    entry.regularTER = isNaN(entry.regularTER) ? null : entry.regularTER;
-    entry.directTER = isNaN(entry.directTER) ? null : entry.directTER;
-    if (!byKey[key]) byKey[key] = entry;
-    list.push(entry);
-  }
-  return { byKey, list };
-}
-
-async function loadTERData(force = false) {
-  if (terData && !force) return terData;
-
-  if (!force) {
-    try {
-      const cached = JSON.parse(localStorage.getItem(TER_CACHE_KEY));
-      if (cached && (Date.now() - cached.fetchedAt) < TER_CACHE_HOURS * 3600 * 1000) {
-        terData = cached;
-        return terData;
-      }
-    } catch (e) { /* ignore corrupt/unavailable cache, fall through to fetch */ }
-  }
-
-  // Try each source in order — a blocked/slow one is timed out and skipped
-  // rather than left to hang, so the next mirror gets a chance quickly.
-  let lastErr = null;
-  for (const url of TER_SOURCES) {
-    try {
-      const text = await _fetchWithTimeout(url, TER_FETCH_TIMEOUT_MS);
-      const { byKey, list } = _parseTERText(text);
-      if (!list.length) throw new Error('Empty/unparseable response');
-      terData = { byKey, list, fetchedAt: Date.now(), stale: false, source: url };
-      try { localStorage.setItem(TER_CACHE_KEY, JSON.stringify(terData)); }
-      catch (e) { /* localStorage full/unavailable — proceed without persistent cache */ }
-      return terData;
-    } catch (e) { lastErr = e; /* try next source */ }
-  }
-
-  // All live sources failed (network blocking GitHub/CDNs entirely, or fully
-  // offline). Fall back to whatever's cached, even if past the normal 24h
-  // TTL, rather than showing nothing — clearly flagged as stale so callers
-  // can show that honestly instead of presenting it as current.
-  try {
-    const cached = JSON.parse(localStorage.getItem(TER_CACHE_KEY));
-    if (cached) {
-      terData = { ...cached, stale: true };
-      return terData;
-    }
-  } catch (e) { /* no usable cache either */ }
-
-  throw lastErr || new Error('TER data unavailable — all sources unreachable and no cache');
-}
-
-// Returns { schemeName, regularTER, directTER, confidence: 'exact'|'approx', fetchedAt } or null.
-async function getTER(fundName) {
-  let data;
-  try { data = await loadTERData(); } catch (e) { return null; }
-// Returns { schemeName, regularTER, directTER, confidence: 'exact'|'approx', fetchedAt, stale } |
-// { unreachable: true } (all sources + cache failed) | null (data loaded fine, fund just not in it).
-async function getTER(fundName) {
-  let data;
-  try { data = await loadTERData(); } catch (e) { return { unreachable: true }; }
-  const qTokens = terTokenize(fundName);
-  if (!qTokens.length) return null;
-  const qKey = qTokens.join('');
-
-  if (data.byKey[qKey]) return { ...data.byKey[qKey], confidence: 'exact', fetchedAt: data.fetchedAt, stale: !!data.stale };
-
-  // Conservative fallback: AMC-identity token (first token) must match exactly,
-  // plus ≥75% token overlap — not a loose substring match.
-  const amcToken = qTokens[0];
-  let best = null, bestScore = 0;
-  for (const entry of data.list) {
-    if (!entry.tokens.length || entry.tokens[0] !== amcToken) continue;
-    const score = terTokenOverlap(qTokens, entry.tokens);
-    if (score > bestScore) { bestScore = score; best = entry; }
-  }
-  if (best && bestScore >= 0.75) return { ...best, confidence: 'approx', fetchedAt: data.fetchedAt, stale: !!data.stale };
-  return null;
-}
-
-// Renders a compact TER badge for inline use in tables/cards. planType: 'direct'|'regular'.
-function terBadgeHTML(terResult, planType) {
-  if (terResult && terResult.unreachable) {
-    return `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);" title="TER data source unreachable right now (GitHub/mirrors blocked or offline) and no cached copy available yet — try again once online, or on a different network">TER: unreachable</span>`;
-  }
-  const asOf = terResult ? new Date(terResult.fetchedAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : '';
-  if (!terResult) {
-    return `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);" title="No TER match found — verify manually via AMC factsheet">—</span>`;
-  }
-  const val = planType === 'direct' ? terResult.directTER : terResult.regularTER;
-  if (val == null) {
-    return `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);" title="Fund matched but ${planType} plan TER not published">—</span>`;
-  }
-  const isApprox = terResult.confidence !== 'exact';
-  const isStale = !!terResult.stale;
-  const color = isStale ? 'var(--warn, #d9a441)' : isApprox ? 'var(--accent)' : 'var(--text2)';
-  const title = `Source: AMFI TER disclosure (community-mirrored, not an official API) · as of ${asOf}` +
-    (isStale ? ' · could not reach a live source just now — showing last cached data, may be more than a day old' : '') +
-    (isApprox ? ' · approximate name match — verify against AMC factsheet before client use' : '');
-  return `<span style="font-family:var(--mono);font-size:10.5px;color:${color};font-weight:600;" title="${title}">${val.toFixed(2)}%${isApprox?' ≈':''}${isStale?' ⏱':''}</span>`;
-}
-
 // ─── NAV ANOMALY DETECTION ──────────────────────────────────
 // Flags implausible day-over-day NAV moves (wrong scheme code, stale/misprinted
 // NAV, decimal-shift feed errors) using a robust MAD-based outlier test rather
@@ -2759,6 +2559,7 @@ function renderFundPage(data) {
   // Fund age
   const ageYears = navArr[0] ? ((navArr[navArr.length-1].date - navArr[0].date)/(365.25*86400000)).toFixed(1) : null;
   // TER & AUM from meta
+  const ter  = meta.scheme_isin_div_reinvest || meta.scheme_isin_growth || null; // not TER but check what's available
   const metaKeys = Object.keys(meta||{});
 
   document.getElementById('fundContent').innerHTML = `
@@ -2772,7 +2573,6 @@ function renderFundPage(data) {
           ${meta.scheme_type    ? `<span class="badge badge-green">${meta.scheme_type}</span>`    : ''}
           <span class="badge badge-orange">NAV ₹${navs[0]?.nav || '-'} · ${navs[0]?.date || '-'}</span>
           ${meta.scheme_isin_growth ? `<span class="badge badge-blue">ISIN: ${meta.scheme_isin_growth}</span>` : ''}
-          <span class="badge" id="fundTERBadge" style="background:var(--surface2);border:1px solid var(--border2);">TER: …</span>
         </div>
         <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;">
           <div>
@@ -2843,20 +2643,6 @@ function renderFundPage(data) {
     <div id="metricContent-chart" style="display:none;">${renderChartSection()}</div>
     <div id="metricContent-drawdown" style="display:none;">${renderDrawdownSection(navArr)}</div>
   `;
-
-  // Fetch TER asynchronously so it doesn't block the rest of the page render —
-  // patches into the badge placeholder once resolved (or on failure/no-match).
-  (async () => {
-    const badge = document.getElementById('fundTERBadge');
-    if (!badge) return;
-    try {
-      const planType = detectPlanType(meta.scheme_name || selectedFund.schemeName).includes('direct') ? 'direct' : 'regular';
-      const ter = await getTER(meta.scheme_name || selectedFund.schemeName);
-      badge.innerHTML = 'TER ' + terBadgeHTML(ter, planType);
-    } catch (e) {
-      badge.textContent = 'TER: —';
-    }
-  })();
 }
 
 // ─── METRIC TAB SWITCH ────────────────────────────────────
@@ -3649,8 +3435,8 @@ function renderRiskSection(risk) {
         <option value="120716">Nifty 50 - UTI Direct Growth</option>
         <option value="125497">Nifty 500 Multicap - HDFC 50:25:25</option>
         <option value="120841">Nifty Next 50 - UTI Regular</option>
-        <option value="147622">Nifty Midcap 150 - Motilal Oswal</option>
-        <option value="118778">Nifty Smallcap 250 - Nippon India</option>
+        <option value="135781">Nifty Midcap 150 - Motilal Oswal</option>
+        <option value="147622">Nifty Smallcap 250 - Nippon India</option>
         <option value="149343">Nifty LargeMidcap 250 - Edelweiss</option>
       </select>
       <button class="btn btn-primary" onclick="loadRiskBenchmark()">Load / Change</button>
@@ -4023,8 +3809,8 @@ const BENCH_CODES = {
   '120716': 'UTI Nifty 50 Index Direct Growth',
   '125497': 'HDFC Nifty 500 Multicap 50:25:25 Direct',
   '120841': 'UTI Nifty Next 50 Regular Growth',
-  '147622': 'Motilal Oswal Nifty Midcap 150 Direct',
-  '118778': 'Nippon India Nifty Smallcap 250 Direct',
+  '135781': 'Motilal Oswal Nifty Midcap 150 Direct',
+  '147622': 'Nippon India Nifty Smallcap 250 Direct',
   '149343': 'Edelweiss Nifty LargeMidcap 250 Direct',
 };
 
@@ -4695,7 +4481,7 @@ const SHARED_BENCH_PILLS = [
   { label:'Nifty 500',       code:'147625' },
   { label:'Nifty Next 50',   code:'143341' },
   { label:'Midcap 150',      code:'147622' },
-  { label:'Smallcap 250',    code:'118778' },
+  { label:'Smallcap 250',    code:'148519' },
   { label:'LargeMidcap 250', code:'149343' },
   { label:'N500 Multicap',   code:'152778' },
 ];
@@ -8386,9 +8172,8 @@ window.runCSR = async function() {
         const gain     = worth - invested;
         const alpha    = (benchXIRR !== null && !isNaN(benchXIRR)) ? (xirr - benchXIRR) : null;
         const instals  = cfs.length - 1; // exclude redemption cashflow
-        const ter = await getTER(f.schemeName).catch(() => null);
 
-        results.push({ name: f.schemeName, code: f.schemeCode, xirr, invested, worth, gain, alpha, cfs: instals, fStart, fEnd, ter });
+        results.push({ name: f.schemeName, code: f.schemeCode, xirr, invested, worth, gain, alpha, cfs: instals, fStart, fEnd });
       } catch(e) {}
       done++;
       statusEl.textContent = `${done} / ${total} funds loaded…`;
@@ -8452,7 +8237,6 @@ window.runCSR = async function() {
       <td style="${tdSt}color:var(--text3);">₹${fmtA(r.invested)}</td>
       <td style="${tdSt}font-weight:600;color:${r.worth > r.invested ? 'var(--positive)' : 'var(--negative)'};">₹${fmtA(r.worth)}</td>
       <td style="${tdSt}color:${gainCol};">${r.gain>=0?'+':'−'}₹${fmtA(Math.abs(r.gain))}</td>
-      <td style="${tdSt}">${terBadgeHTML(r.ter, plan.includes('direct') ? 'direct' : 'regular')}</td>
       ${hasBench ? `<td style="${tdSt}font-weight:700;color:${alphaCol};">${r.alpha !== null ? (r.alpha>0?'+':'')+r.alpha.toFixed(2)+'%' : '—'}</td>` : ''}
     </tr>`;
   };
@@ -8465,7 +8249,6 @@ window.runCSR = async function() {
     <td style="${tdSt}color:var(--text3);">₹${fmtA(avgInvested)}</td>
     <td style="${tdSt}font-weight:600;color:var(--positive);">₹${fmtA(avgWorth)}</td>
     <td style="${tdSt}color:var(--positive);">+₹${fmtA(Math.abs(avgGain))}</td>
-    <td style="${tdSt}color:var(--text3);">—</td>
     ${hasBench ? `<td style="${tdSt}font-weight:700;color:${avgAlphaCol};">${avgAlpha !== null ? (avgAlpha>0?'+':'')+avgAlpha.toFixed(2)+'%' : '—'}</td>` : ''}
   </tr>`;
 
@@ -8474,7 +8257,6 @@ window.runCSR = async function() {
     <td style="${tdStL}font-weight:600;color:var(--accent);">${_csrBenchName} (Benchmark)</td>
     <td style="${tdSt}font-weight:700;color:var(--accent);">${benchXIRR.toFixed(2)}%</td>
     <td style="${tdSt}color:var(--text3);">₹${fmtA(avgInvested)}</td>
-    <td style="${tdSt}color:var(--text3);">—</td>
     <td style="${tdSt}color:var(--text3);">—</td>
     <td style="${tdSt}color:var(--text3);">—</td>
     <td style="${tdSt}color:var(--text3);">—</td>
@@ -8522,7 +8304,6 @@ window.runCSR = async function() {
           <th style="${hdrSt}">Invested</th>
           <th style="${hdrSt}">Value</th>
           <th style="${hdrSt}">Gain</th>
-          <th style="${hdrSt}">TER</th>
           ${hasBench ? `<th style="${hdrSt}color:var(--accent);">Alpha</th>` : ''}
         </tr></thead>
         <tbody>
@@ -8534,8 +8315,7 @@ window.runCSR = async function() {
       </div><!-- end csr-snapshot-inner -->
     </div><!-- end csr-snapshot-wrap -->
     <div style="margin-top:8px;font-size:9px;font-family:var(--mono);color:var(--text3);">
-      * XIRR via Newton-Raphson · Monthly SIP on 1st of month · Click any row to open fund · Alpha = Fund XIRR − Benchmark XIRR<br>
-      * TER: AMFI disclosure via community-mirrored source (not an official API) · "≈" = approximate name match, verify before client use
+      * XIRR via Newton-Raphson · Monthly SIP on 1st of month · Click any row to open fund · Alpha = Fund XIRR − Benchmark XIRR
     </div>`;
 
   // Store snapshot metadata for export
@@ -9335,7 +9115,7 @@ const WL_BENCH_PILLS = [
   { label:'Nifty 500',       code:'147625' },
   { label:'Nifty Next 50',   code:'143341' },
   { label:'Midcap 150',      code:'147622' },
-  { label:'Smallcap 250',    code:'118778' },
+  { label:'Smallcap 250',    code:'148519' },
   { label:'LargeMidcap 250', code:'149343' },
   { label:'N500 Multicap',   code:'152778' },
 ];
