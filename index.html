@@ -975,6 +975,7 @@
     <div class="nav-tab" onclick="switchPage('isinlookup')">ISIN</div>
     <div class="nav-tab" onclick="switchPage('navdl')">NAV Data</div>
     <div class="nav-tab" onclick="switchPage('taxcalc')">Tax Estimator</div>
+    <div class="nav-tab" onclick="switchPage('apistatus')">API Status</div>
   </div>
   <div style="display:flex;align-items:center;gap:12px;">
     <div class="sync-status">
@@ -1033,6 +1034,10 @@
     <div class="mobile-drawer-section">
       <div class="mobile-drawer-label">Portfolio Analysis</div>
       <div class="mobile-nav-item" id="mnav-corrmatrix" onclick="mobileNav('corrmatrix')"><span class="mobile-nav-icon">▦</span>Correlation</div>
+    </div>
+    <div class="mobile-drawer-section">
+      <div class="mobile-drawer-label">Diagnostics</div>
+      <div class="mobile-nav-item" id="mnav-apistatus" onclick="mobileNav('apistatus')"><span class="mobile-nav-icon">📡</span>API Status</div>
     </div>
   </div>
 </div>
@@ -1979,6 +1984,19 @@
       </div>
     </div>
 
+    <!-- API STATUS / CONNECTIVITY DIAGNOSTICS PAGE -->
+    <div class="page" id="page-apistatus">
+      <div class="section-title">API Status</div>
+      <div class="ptp-card">
+        <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:18px;line-height:1.6;">
+          Runs a live check from this device against the NAV data proxy and the underlying mfapi.in service,
+          so you can tell whether a "no data" problem is your network, the proxy worker, or mfapi.in itself.
+        </div>
+        <button class="btn btn-primary" onclick="runAPIStatusCheck()">▶ Test Connection</button>
+        <div id="apiStatusResult" style="margin-top:18px;"></div>
+      </div>
+    </div>
+
     <!-- OVERLAP ANALYZER PAGE -->
     <div class="page" id="page-overlap">
       <div class="section-title">Fund Overlap Analyzer</div>
@@ -2324,6 +2342,110 @@ async function getNav(schemeCode) {
   return data;
 }
 
+// ─── API STATUS / CONNECTIVITY DIAGNOSTICS ───────────────────
+// Runs live checks from the current device/network — not from a server —
+// since the whole point is to reflect the actual conditions the person is
+// using the tool under, which a server-side check couldn't tell them.
+const API_STATUS_TEST_CODE = '120716'; // Nifty 50 TRI — used as a benchmark elsewhere, known-stable
+async function _timedFetch(url, opts) {
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url, opts);
+    const ms = Math.round(performance.now() - t0);
+    if (!res.ok) return { ok: false, ms, error: 'HTTP ' + res.status };
+    const data = await res.json().catch(() => null);
+    return { ok: true, ms, data };
+  } catch (e) {
+    const ms = Math.round(performance.now() - t0);
+    return { ok: false, ms, error: e.message || 'Network error' };
+  }
+}
+
+window.runAPIStatusCheck = async function() {
+  const el = document.getElementById('apiStatusResult');
+  el.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--text3);">Running checks…</div>`;
+
+  const checks = [
+    {
+      label: 'NAV Proxy — fund list',
+      detail: 'mfapi-proxy.storage4myfile.workers.dev/mf',
+      run: () => _timedFetch('https://mfapi-proxy.storage4myfile.workers.dev/mf'),
+      validate: r => Array.isArray(r.data) && r.data.length > 1000,
+    },
+    {
+      label: 'NAV Proxy — fund detail',
+      detail: `mfapi-proxy.storage4myfile.workers.dev/mf/${API_STATUS_TEST_CODE}`,
+      run: () => _timedFetch(`https://mfapi-proxy.storage4myfile.workers.dev/mf/${API_STATUS_TEST_CODE}`),
+      validate: r => r.data && Array.isArray(r.data.data) && r.data.data.length > 0,
+    },
+    {
+      label: 'mfapi.in — direct (bypassing proxy)',
+      detail: `api.mfapi.in/mf/${API_STATUS_TEST_CODE}`,
+      run: () => _timedFetch(`https://api.mfapi.in/mf/${API_STATUS_TEST_CODE}`),
+      validate: r => r.data && Array.isArray(r.data.data) && r.data.data.length > 0,
+    },
+    {
+      label: 'TER data source',
+      detail: 'AMFI TER mirror (GitHub / jsDelivr / statically.io)',
+      run: async () => {
+        const t0 = performance.now();
+        try {
+          const d = await loadTERData(true); // force a fresh check, bypass cache
+          return { ok: !d.stale, ms: Math.round(performance.now()-t0), data: d, stale: d.stale };
+        } catch (e) {
+          return { ok: false, ms: Math.round(performance.now()-t0), error: e.message };
+        }
+      },
+      validate: r => r.ok,
+    },
+  ];
+
+  const results = [];
+  for (const c of checks) {
+    const r = await c.run();
+    const passed = !r.error && c.validate(r);
+    results.push({ ...c, ...r, passed });
+  }
+
+  const rows = results.map(r => {
+    const color = r.passed ? 'var(--positive)' : (r.stale ? 'var(--warn, #d9a441)' : 'var(--danger)');
+    const statusText = r.passed ? '✓ OK' : (r.stale ? '⏱ Using stale cache' : '✕ Failed');
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border:1px solid var(--border2);border-radius:8px;margin-bottom:8px;background:var(--surface2);">
+      <div>
+        <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);">${r.label}</div>
+        <div style="font-family:var(--mono);font-size:9.5px;color:var(--text3);margin-top:2px;">${r.detail}${r.error ? ' · ' + r.error : ''}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:${color};">${statusText}</div>
+        <div style="font-family:var(--mono);font-size:9.5px;color:var(--text3);margin-top:2px;">${r.ms}ms</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const allOk = results.every(r => r.passed);
+  const proxyFailed = !results[0].passed || !results[1].passed;
+  const directFailed = !results[2].passed;
+  let diagnosis;
+  if (allOk) {
+    diagnosis = { text: 'Everything reachable — NAV data, XIRR calcs, and TER lookups should all work normally.', color: 'var(--positive)' };
+  } else if (proxyFailed && !directFailed) {
+    diagnosis = { text: 'The proxy worker is down or unreachable, but mfapi.in itself is fine — NAV data will fail on this tool specifically until the proxy recovers.', color: 'var(--danger)' };
+  } else if (proxyFailed && directFailed) {
+    diagnosis = { text: 'Both the proxy and mfapi.in directly are unreachable from this device — likely a network/connectivity issue on this end, not the service itself.', color: 'var(--danger)' };
+  } else {
+    diagnosis = { text: 'NAV data is fine; check the individual failed row above for what\'s affected.', color: 'var(--warn, #d9a441)' };
+  }
+
+  el.innerHTML = `
+    ${rows}
+    <div style="margin-top:10px;padding:10px 14px;border-radius:8px;background:rgba(232,170,46,0.06);border:1px solid rgba(232,170,46,0.25);font-family:var(--mono);font-size:11px;color:var(--text2);">
+      ${diagnosis.text}
+    </div>
+    <div style="margin-top:8px;font-size:9.5px;font-family:var(--mono);color:var(--text3);">
+      Checked from this device at ${new Date().toLocaleTimeString('en-IN')} · re-run any time network conditions change
+    </div>`;
+};
+
 // ─── TER (TOTAL EXPENSE RATIO) LOOKUP ────────────────────────
 // mfapi.in has no TER data — only AMFI publishes it, and only via a JS-driven
 // page with no clean API. This uses a community-maintained daily mirror of
@@ -2474,10 +2596,6 @@ async function loadTERData(force = false) {
   throw lastErr || new Error('TER data unavailable — all sources unreachable and no cache');
 }
 
-// Returns { schemeName, regularTER, directTER, confidence: 'exact'|'approx', fetchedAt } or null.
-async function getTER(fundName) {
-  let data;
-  try { data = await loadTERData(); } catch (e) { return null; }
 // Returns { schemeName, regularTER, directTER, confidence: 'exact'|'approx', fetchedAt, stale } |
 // { unreachable: true } (all sources + cache failed) | null (data loaded fine, fund just not in it).
 async function getTER(fundName) {
@@ -5164,7 +5282,7 @@ window.calcRollingMulti = async function() {
 window.switchPage = function(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${page}`)?.classList.add('active');
-  const pages = ['fund','compare','sipcalc','ptpcalc','rollingcalc','stepupcalc','swpcalc','chartcmp','catscanner','lumpsip','goalcalc','corrmatrix','fundmgr','catheatmap','isinlookup','navdl','taxcalc'];
+  const pages = ['fund','compare','sipcalc','ptpcalc','rollingcalc','stepupcalc','swpcalc','chartcmp','catscanner','lumpsip','goalcalc','corrmatrix','fundmgr','catheatmap','isinlookup','navdl','taxcalc','apistatus'];
   document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', pages[i] === page));
   updateBottomNav(page);
   updateDrawerNav(page);
@@ -5179,6 +5297,10 @@ window.switchPage = function(page) {
     const t = new Date(), p = new Date(t); p.setFullYear(t.getFullYear()-2);
     document.getElementById('taxPurchaseDate').value = p.toISOString().split('T')[0];
     document.getElementById('taxRedemptionDate').value = t.toISOString().split('T')[0];
+  }
+  if (page === 'apistatus' && !window._apiStatusAutoRan) {
+    window._apiStatusAutoRan = true;
+    setTimeout(() => window.runAPIStatusCheck(), 100);
   }
 }
 
