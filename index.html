@@ -10589,12 +10589,12 @@ window.runCPTPR = async function() {
 
   results.sort((a, b) => b.pct - a.pct);
   const periodLabel = (custS && custE) ? 'Custom' : asOnVal ? `${_cptprPeriod} (As On ${new Date(asOnVal).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})})` : _cptprPeriod;
-  _cptprResults = { results, benchReturn, catVal, plan, amt, startDate, endDate, period: _cptprPeriod, periodLabel, benchName: _cptprBenchName };
+  _cptprResults = { results, benchReturn, catVal, plan, amt, startDate, endDate, period: _cptprPeriod, periodLabel, benchName: _cptprBenchName, cptprAmbiguousCount };
   statusEl.textContent = `✓ ${results.length} funds ranked`;
   cptprRenderResults(_cptprResults);
 };
 
-function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate, endDate, period, periodLabel, benchName }) {
+function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate, endDate, period, periodLabel, benchName, cptprAmbiguousCount = 0 }) {
   const resultEl = document.getElementById('cptprResult');
   if (!resultEl) return;
 
