@@ -2321,14 +2321,32 @@ function _filterStale(funds) {
 async function searchFunds(q) {
   // Ensure stale filter is ready (non-blocking — fires in background on first call)
   _ensureStaleFilter();
+  let searchEndpointFailed = false;
   // Use search endpoint instead of loading all 17000 funds
   try {
     const r = await fetch(`https://mfapi-proxy.storage4myfile.workers.dev/mf/search?q=${encodeURIComponent(q)}`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
     if (Array.isArray(data) && data.length > 0) return _filterStale(data).slice(0, 30);
-  } catch(e) {}
-  // Fallback: filter from cached list
-  if (allFunds.length === 0) return [];
+    if (!Array.isArray(data)) throw new Error('Malformed response');
+    // data is a valid empty array — genuinely no matches, not a failure
+  } catch(e) { searchEndpointFailed = true; }
+
+  // Fallback: filter from cached list. If it's empty too (e.g. this is the
+  // first thing the person searched this session, on a page like ISIN Lookup
+  // that doesn't pre-load it), fetch+cache the full list once rather than
+  // silently returning nothing — a real failure should still find results
+  // if the underlying data is reachable at all, just via a slower path.
+  if (allFunds.length === 0) {
+    if (!searchEndpointFailed) return []; // search endpoint itself said "no matches", trust that
+    try {
+      const r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      allFunds = _dedupeFundList(await r.json());
+    } catch (e) {
+      throw new Error('Fund search is unreachable right now — check API Status'); // let caller surface this
+    }
+  }
   const ql = q.toLowerCase();
   const matched = allFunds.filter(f => f.schemeName.toLowerCase().includes(ql));
   return _filterStale(matched).slice(0, 30);
@@ -2379,6 +2397,12 @@ window.runAPIStatusCheck = async function() {
       validate: r => r.data && Array.isArray(r.data.data) && r.data.data.length > 0,
     },
     {
+      label: 'NAV Proxy — search endpoint',
+      detail: 'mfapi-proxy.storage4myfile.workers.dev/mf/search?q=hdfc (used by ISIN Lookup, fund search everywhere)',
+      run: () => _timedFetch('https://mfapi-proxy.storage4myfile.workers.dev/mf/search?q=hdfc'),
+      validate: r => Array.isArray(r.data) && r.data.length > 0,
+    },
+    {
       label: 'mfapi.in — direct (bypassing proxy)',
       detail: `api.mfapi.in/mf/${API_STATUS_TEST_CODE}`,
       run: () => _timedFetch(`https://api.mfapi.in/mf/${API_STATUS_TEST_CODE}`),
@@ -2423,15 +2447,19 @@ window.runAPIStatusCheck = async function() {
   }).join('');
 
   const allOk = results.every(r => r.passed);
-  const proxyFailed = !results[0].passed || !results[1].passed;
-  const directFailed = !results[2].passed;
+  const byLabel = label => results.find(r => r.label === label);
+  const proxyFailed = !byLabel('NAV Proxy — fund list').passed || !byLabel('NAV Proxy — fund detail').passed;
+  const searchFailed = !byLabel('NAV Proxy — search endpoint').passed;
+  const directFailed = !byLabel('mfapi.in — direct (bypassing proxy)').passed;
   let diagnosis;
   if (allOk) {
-    diagnosis = { text: 'Everything reachable — NAV data, XIRR calcs, and TER lookups should all work normally.', color: 'var(--positive)' };
+    diagnosis = { text: 'Everything reachable — NAV data, XIRR calcs, fund search, and TER lookups should all work normally.', color: 'var(--positive)' };
   } else if (proxyFailed && !directFailed) {
     diagnosis = { text: 'The proxy worker is down or unreachable, but mfapi.in itself is fine — NAV data will fail on this tool specifically until the proxy recovers.', color: 'var(--danger)' };
   } else if (proxyFailed && directFailed) {
     diagnosis = { text: 'Both the proxy and mfapi.in directly are unreachable from this device — likely a network/connectivity issue on this end, not the service itself.', color: 'var(--danger)' };
+  } else if (searchFailed) {
+    diagnosis = { text: 'The search endpoint specifically is down — this breaks ISIN Lookup and fund search everywhere, even though NAV data itself may be fine. Search falls back to loading the full fund list, which is slower but should still work.', color: 'var(--warn, #d9a441)' };
   } else {
     diagnosis = { text: 'NAV data is fine; check the individual failed row above for what\'s affected.', color: 'var(--warn, #d9a441)' };
   }
@@ -2968,7 +2996,7 @@ function renderFundPage(data) {
     const badge = document.getElementById('fundTERBadge');
     if (!badge) return;
     try {
-      const planType = detectPlanType(meta.scheme_name || selectedFund.schemeName).includes('direct') ? 'direct' : 'regular';
+      const planType = detectPlanType(meta.scheme_name || selectedFund.schemeName, selectedFund.schemeCode).includes('direct') ? 'direct' : 'regular';
       const ter = await getTER(meta.scheme_name || selectedFund.schemeName);
       badge.innerHTML = 'TER ' + terBadgeHTML(ter, planType);
     } catch (e) {
@@ -4810,7 +4838,7 @@ window._selectRollingBench = function(code, name) {
 // ─── SHARED BENCHMARK PILLS ──────────────────────────────
 const SHARED_BENCH_PILLS = [
   { label:'Nifty 50',        code:'120716' },
-  { label:'Nifty 500',       code:'147625' },
+  { label:'Nifty 500',       code:'120503' },
   { label:'Nifty Next 50',   code:'143341' },
   { label:'Midcap 150',      code:'147622' },
   { label:'Smallcap 250',    code:'118778' },
@@ -5016,13 +5044,27 @@ window.calcRollingMulti = async function() {
   try {
     const bench = await loadBenchmark(benchCode, null, null, 0, 'rolling');
     let benchRolling = null;
-    if (bench) {
+    let benchFailReason = '';
+    if (benchCode && !bench) {
+      benchFailReason = 'Benchmark data could not be loaded — check the scheme code, or try API Status if this keeps happening.';
+    } else if (bench) {
       const bFeas = checkFeasibility(bench.navArr);
-      if (bFeas.ok) {
+      if (!bFeas.ok) {
+        benchFailReason = `Benchmark (${bench.name}) doesn't have enough overlapping data for this window/date range — ${bFeas.hint || 'insufficient history.'}`;
+      } else {
         const br = calcFundRolling(bench.navArr);
-        benchRolling = br.median !== null ? { ...br, name: bench.name } : null;
+        if (br.median === null) {
+          benchFailReason = `Benchmark (${bench.name}) loaded, but no valid ${window_}Y rolling periods could be computed from it.`;
+        } else {
+          benchRolling = { ...br, name: bench.name };
+        }
       }
     }
+    const benchWarnBanner = benchFailReason ? `
+      <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(255,153,0,0.08);border:1px solid rgba(255,153,0,0.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-family:var(--mono);font-size:11px;">
+        <span style="color:var(--warn);font-size:16px;line-height:1;">⚠</span>
+        <div><div style="color:var(--warn);font-weight:600;margin-bottom:4px;">Benchmark not shown</div><div style="color:var(--text3);line-height:1.5;">${benchFailReason} Fund results below are still valid — just no comparison line/Alpha column.</div></div>
+      </div>` : '';
 
     // Thin sample global warning
     const thinGlobalWarn = fromDate ? (() => {
@@ -5179,7 +5221,7 @@ window.calcRollingMulti = async function() {
           <canvas id="rollingChartCanvas"></canvas>
         </div>
       </div>`;
-    resultEl.innerHTML = thinGlobalWarn + fromBanner + summary + chartHtml + resultsTable(cols, tableRows, tableNote);
+    resultEl.innerHTML = thinGlobalWarn + benchWarnBanner + fromBanner + summary + chartHtml + resultsTable(cols, tableRows, tableNote);
 
     // ── Draw rolling chart ──
     const CHART_COLORS = ['#f0b429','#00c48c','#4e9af1','#ff9933','#c084fc','#fb7185','#34d399'];
@@ -5328,6 +5370,7 @@ window.switchCompareMode = function(mode) {
             <option value="all">All Plans</option>
             <option value="direct_idcw">Direct IDCW</option>
             <option value="regular_idcw">Regular IDCW</option>
+            <option value="ambiguous">Unclear plan (verify)</option>
           </select>
         </div>
         <div class="input-group">
@@ -5438,14 +5481,44 @@ function detectCategory(name) {
   return 'other';
 }
 
-function detectPlanType(name) {
+// Manual overrides for scheme codes where AMFI's/mfapi's source data doesn't
+// carry Direct/Regular in the scheme name at all (seen first on a newly
+// launched Motilal Oswal Arbitrage Fund — likely a wider AMFI reporting
+// format change, not a one-off). Each entry here has been independently
+// verified — either via ISIN cross-reference against a known site, or via
+// NAV comparison across a fund's sibling scheme codes (Direct NAV is always
+// ≥ Regular NAV for the same underlying scheme, since SEBI mandates
+// identical portfolios between the two — only TER differs, and lower TER
+// compounds to a higher NAV over time. This is a structural guarantee, not
+// a heuristic guess, but only applied per-code here after manual
+// confirmation, rather than as an automatic blanket rule that could misfire
+// on funds that aren't true siblings).
+const PLAN_TYPE_OVERRIDES = {
+  '153187': 'direct_growth',   // Motilal Oswal Arbitrage Fund — confirmed via ISIN INF247L01ED1 (Zerodha/PayTM Money)
+  '153188': 'regular_growth',  // Motilal Oswal Arbitrage Fund — NAV consistently below 153187's Growth-pair NAV
+  '153185': 'direct_idcw',     // Motilal Oswal Arbitrage Fund — IDCW pair, higher NAV of the two
+  '153186': 'regular_idcw',    // Motilal Oswal Arbitrage Fund — IDCW pair, lower NAV of the two
+};
+
+function detectPlanType(name, schemeCode) {
+  if (schemeCode != null && PLAN_TYPE_OVERRIDES[String(schemeCode)]) {
+    return PLAN_TYPE_OVERRIDES[String(schemeCode)];
+  }
   const n = name.toLowerCase();
-  const isDirect = n.includes('direct');
+  const hasDirect  = /\bdirect\b/.test(n);
+  const hasRegular = /\bregular\b/.test(n);
   const isIDCW = n.includes('idcw') || n.includes('dividend');
-  if (isDirect && isIDCW) return 'direct_idcw';
-  if (!isDirect && isIDCW) return 'regular_idcw';
-  if (isDirect) return 'direct_growth';
-  return 'regular_growth';
+  // Previously this defaulted to 'regular_growth' whenever "direct" wasn't
+  // found in the name — silently misclassifying any fund whose source-data
+  // name doesn't explicitly say either word. An honest "can't tell" is
+  // safer than a confident wrong plan classification, so unlabeled or
+  // contradictory names are now flagged 'ambiguous' and excluded from strict
+  // plan-type filters (Category SIP/PTP Ranker) rather than silently folded
+  // into Regular. Known cases get resolved via PLAN_TYPE_OVERRIDES above
+  // instead — see that comment for how those are verified.
+  if (hasDirect && !hasRegular)  return isIDCW ? 'direct_idcw'   : 'direct_growth';
+  if (hasRegular && !hasDirect)  return isIDCW ? 'regular_idcw'  : 'regular_growth';
+  return isIDCW ? 'ambiguous_idcw' : 'ambiguous';
 }
 
 window.loadAMCFundList = async function() {
@@ -5460,7 +5533,7 @@ window.loadAMCFundList = async function() {
   const matchLower = exactMatch.toLowerCase();
   amcFundListCache = allFunds
     .filter(f => f.schemeName.toLowerCase().includes(matchLower))
-    .map(f => ({ ...f, planType: detectPlanType(f.schemeName), category: detectCategory(f.schemeName) }));
+    .map(f => ({ ...f, planType: detectPlanType(f.schemeName, f.schemeCode), category: detectCategory(f.schemeName) }));
   document.getElementById('amcLoadStatus').textContent = `${amcFundListCache.length} total funds`;
   if (!amcFundListCache.length) {
     document.getElementById('amcChecklist').innerHTML = `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:12px;">No funds found. Try a different AMC.</div>`;
@@ -5490,7 +5563,7 @@ function renderAMCChecklist(funds) {
     return;
   }
   const CAT_BADGE = { equity:'badge-orange', debt:'badge-blue', hybrid:'badge-green', fof:'badge-blue', index:'badge-green', other:'' };
-  const PLAN_LABEL = { direct_growth:'Direct', regular_growth:'Regular', direct_idcw:'Direct IDCW', regular_idcw:'Regular IDCW' };
+  const PLAN_LABEL = { direct_growth:'Direct', regular_growth:'Regular', direct_idcw:'Direct IDCW', regular_idcw:'Regular IDCW', ambiguous:'Unclear (verify)', ambiguous_idcw:'Unclear IDCW (verify)' };
   document.getElementById('amcChecklist').innerHTML = `
     <div style="margin-top:16px; max-height:400px; overflow-y:auto; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:8px;">
       ${funds.map((f,i) => `
@@ -8402,8 +8475,10 @@ window.runCSR = async function() {
       for (const ex of alwaysExclude) { if (n.includes(ex)) return false; }
       return true;
     })
-    .map(f => ({ ...f, planType: detectPlanType(f.schemeName) }))
-    .filter(f => f.planType === plan);
+    .map(f => ({ ...f, planType: detectPlanType(f.schemeName, f.schemeCode) }));
+  const ambiguousCount = funds.filter(f => f.planType === 'ambiguous' || f.planType === 'ambiguous_idcw').length;
+  funds = funds.filter(f => f.planType === plan);
+  window._csrAmbiguousCount = ambiguousCount;
 
   await _ensureStaleFilter();
   if (_staleCodes && _staleCodes.size > 0)
@@ -8658,6 +8733,7 @@ window.runCSR = async function() {
     <div style="margin-top:8px;font-size:9px;font-family:var(--mono);color:var(--text3);">
       * XIRR via Newton-Raphson · Monthly SIP on 1st of month · Click any row to open fund · Alpha = Fund XIRR − Benchmark XIRR<br>
       * TER: AMFI disclosure via community-mirrored source (not an official API) · "≈" = approximate name match, verify before client use
+      ${ambiguousCount > 0 ? `<br>* ${ambiguousCount} fund${ambiguousCount>1?'s':''} in this category ${ambiguousCount>1?'were':'was'} excluded — their scheme name doesn't clearly state Direct or Regular, so plan type couldn't be reliably determined. Check the Fund page or ISIN directly if you need ${ambiguousCount>1?'them':'it'}.` : ''}
     </div>`;
 
   // Store snapshot metadata for export
@@ -9454,7 +9530,7 @@ setTimeout(() => { swpRenderBuckets(); }, 750);
 
 const WL_BENCH_PILLS = [
   { label:'Nifty 50',        code:'120716' },
-  { label:'Nifty 500',       code:'147625' },
+  { label:'Nifty 500',       code:'120503' },
   { label:'Nifty Next 50',   code:'143341' },
   { label:'Midcap 150',      code:'147622' },
   { label:'Smallcap 250',    code:'118778' },
@@ -9730,14 +9806,23 @@ window.isinOnInput = function(val) {
   if (!res) return;
   if (val.trim().length < 2) { res.style.display = 'none'; return; }
   _isinTimer = setTimeout(async () => {
-    const funds = await searchFunds(val.trim());
-    if (!funds.length) { res.style.display = 'none'; return; }
-    res.innerHTML = funds.map(f => `
-      <div class="search-result-item" onmousedown="isinSelectFund('${f.schemeCode}',\`${f.schemeName.replace(/`/g,"'")}\`)">
-        <div class="result-name">${f.schemeName}</div>
-        <div class="result-meta">${f.schemeCode}</div>
-      </div>`).join('');
-    res.style.display = 'block';
+    try {
+      const funds = await searchFunds(val.trim());
+      if (!funds.length) {
+        res.innerHTML = `<div style="padding:12px;font-family:var(--mono);font-size:11px;color:var(--text3);">No matches for "${val.trim()}"</div>`;
+        res.style.display = 'block';
+        return;
+      }
+      res.innerHTML = funds.map(f => `
+        <div class="search-result-item" onmousedown="isinSelectFund('${f.schemeCode}',\`${f.schemeName.replace(/`/g,"'")}\`)">
+          <div class="result-name">${f.schemeName}</div>
+          <div class="result-meta">${f.schemeCode}</div>
+        </div>`).join('');
+      res.style.display = 'block';
+    } catch (e) {
+      res.innerHTML = `<div style="padding:12px;font-family:var(--mono);font-size:11px;color:var(--danger);">${e.message} — check API Status page</div>`;
+      res.style.display = 'block';
+    }
   }, 300);
 };
 
@@ -10417,7 +10502,7 @@ window.runCPTPR = async function() {
   // Load all funds (reuse cached allFunds from CSR if available)
   if (!window.allFunds) {
     try {
-      const r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf/latest');
+      const r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf');
       window.allFunds = _dedupeFundList(await r.json());
     } catch(e) { showToast('Could not load fund list', 'error'); statusEl.textContent = ''; return; }
   }
@@ -10456,8 +10541,9 @@ window.runCPTPR = async function() {
     for (const ex of excludeTerms) if (n.includes(ex)) return false;
     for (const ex of alwaysEx)     if (n.includes(ex)) return false;
     return true;
-  }).map(f => ({ ...f, planType: detectPlanType(f.schemeName) }))
-    .filter(f => f.planType === plan);
+  }).map(f => ({ ...f, planType: detectPlanType(f.schemeName, f.schemeCode) }));
+  const cptprAmbiguousCount = funds.filter(f => f.planType === 'ambiguous' || f.planType === 'ambiguous_idcw').length;
+  funds = funds.filter(f => f.planType === plan);
 
   if (window._staleCodes?.size > 0)
     funds = funds.filter(f => !window._staleCodes.has(String(f.schemeCode)));
@@ -10578,6 +10664,7 @@ function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate
     <div style="padding:8px 14px;border-top:1px solid var(--border2);">
       <span style="font-family:var(--mono);font-size:9px;color:var(--text3);">
         * CAGR for ≥1Y · Absolute for &lt;1Y · Value = ₹${(amt/1000).toFixed(0)}K invested at start NAV · Alpha = Fund% − Bench%
+        ${cptprAmbiguousCount > 0 ? `<br>* ${cptprAmbiguousCount} fund${cptprAmbiguousCount>1?'s':''} in this category ${cptprAmbiguousCount>1?'were':'was'} excluded — their scheme name doesn't clearly state Direct or Regular, so plan type couldn't be reliably determined.` : ''}
       </span>
     </div>
   </div>`;
