@@ -3412,7 +3412,19 @@ function buildSIPCashflows(navArr, startDate, endDate, amt, frequency = 'monthly
     for (let i = 0; i < navArr.length; i++) {
       if (navArr[i].date.getTime() >= tMs) { nav = navArr[i]; break; }
     }
-    if (nav) cashflows.push({ date: new Date(d), amount: -amt, nav: nav.nav });
+    // Skip this installment if the fund didn't exist yet at this date — i.e.
+    // the nearest available NAV on/after the intended date is much later
+    // than intended, not just a weekend/holiday gap. Without this check,
+    // every installment before a fund's actual launch silently matches the
+    // same first-available NAV, inflating the installment count and
+    // distorting XIRR as though the fund had existed for the full period.
+    // ~10 days absorbs normal non-trading stretches (weekends, multi-day
+    // holiday clusters) without accepting a fund that simply launched
+    // months or years later.
+    if (nav) {
+      const gapDays = (nav.date.getTime() - tMs) / 86400000;
+      if (gapDays <= 10) cashflows.push({ date: new Date(d), amount: -amt, nav: nav.nav });
+    }
     d = advance(d);
   }
 
@@ -9942,6 +9954,11 @@ function wlCalcLump(navArr, start, end) {
   const sn = navOnOrAfterWL(navArr, start);
   const en = navOnOrBeforeWL(navArr, end);
   if (!sn || !en || en.date <= sn.date) return null;
+  // Same guard as cptprCalcReturn — don't silently substitute a shorter
+  // window (and misleadingly annualize it) for a fund that didn't exist yet
+  // at the requested start date.
+  const gapDays = (sn.date.getTime() - start.getTime()) / 86400000;
+  if (gapDays > 10) return null;
   const years = (en.date - sn.date) / (365.25*24*3600*1000);
   const ratio = en.nav / sn.nav;
   return years >= 1
@@ -10465,6 +10482,16 @@ function cptprCalcReturn(navArr, start, end) {
   const sn = navOnOrAfterWL(navArr, start);
   const en = navOnOrBeforeWL(navArr, end);
   if (!sn || !en || en.date <= sn.date) return null;
+  // If the fund's first available NAV on/after `start` is meaningfully later
+  // than the requested start date, the fund didn't exist (or had no NAV
+  // record) yet at that date — it shouldn't be silently given a shorter,
+  // annualized return as if it covered the full requested period, since
+  // that produces a misleadingly inflated/deflated CAGR next to funds that
+  // genuinely have data for the whole span. A ~10 day tolerance absorbs
+  // weekends/holidays around the exact requested date without accepting
+  // funds that simply launched later.
+  const gapDays = (sn.date.getTime() - start.getTime()) / 86400000;
+  if (gapDays > 10) return null;
   const years = (en.date - sn.date) / (365.25*24*3600*1000);
   const ratio = en.nav / sn.nav;
   return years >= 1
