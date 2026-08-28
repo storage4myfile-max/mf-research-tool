@@ -969,11 +969,16 @@
     <div class="nav-tab" onclick="switchPage('apistatus')">API Status</div>
   </div>
   <div style="display:flex;align-items:center;gap:12px;">
-    <div class="header-search-group" style="display:flex;align-items:center;gap:12px;">
-      <div class="search-input-wrap" style="width:230px;">
-        <span class="search-icon">⌕</span>
-        <input class="search-input" type="text" id="searchInput" placeholder="Search fund name..." autocomplete="off" style="padding-top:7px;padding-bottom:7px;">
-        <div class="search-results" id="searchResults" style="display:none;"></div>
+    <div class="header-search-group" style="display:flex;align-items:center;gap:8px;position:relative;">
+      <button id="headerSearchToggle" onclick="window.toggleHeaderSearch()" title="Search funds" style="background:transparent;border:1px solid var(--border2);border-radius:6px;padding:6px 8px;cursor:pointer;display:flex;align-items:center;color:var(--accent);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <div id="headerSearchPopover" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:280px;z-index:250;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:var(--shadow-lg);">
+        <div class="search-input-wrap" style="width:100%;">
+          <span class="search-icon">⌕</span>
+          <input class="search-input" type="text" id="searchInput" placeholder="Search fund name..." autocomplete="off" style="padding-top:7px;padding-bottom:7px;">
+          <div class="search-results" id="searchResults" style="display:none;"></div>
+        </div>
       </div>
       <button onclick="window.openChangelog()" title="Changelog" style="background:transparent;border:1px solid var(--border2);border-radius:6px;padding:6px 8px;cursor:pointer;display:flex;align-items:center;color:var(--text3);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text3)'">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -2784,10 +2789,22 @@ function initSearchListener() {
 // Init search on page load
 setTimeout(initSearchListener, 500);
 
+window.toggleHeaderSearch = function() {
+  const pop = document.getElementById('headerSearchPopover');
+  if (!pop) return;
+  const opening = pop.style.display === 'none';
+  pop.style.display = opening ? 'block' : 'none';
+  if (opening) setTimeout(() => document.getElementById('searchInput')?.focus(), 50);
+};
+
 document.addEventListener('click', e => {
   if (!e.target.closest('.search-input-wrap')) {
     const resEl = document.getElementById('searchResults');
     if (resEl) resEl.style.display = 'none';
+  }
+  const pop = document.getElementById('headerSearchPopover');
+  if (pop && pop.style.display !== 'none' && !e.target.closest('#headerSearchPopover') && !e.target.closest('#headerSearchToggle')) {
+    pop.style.display = 'none';
   }
 });
 
@@ -2806,6 +2823,8 @@ function renderSearchResults(results) {
 window._searchSelectFund = async function(code, name) {
   document.getElementById('searchResults').style.display = 'none';
   document.getElementById('searchInput').value = '';
+  const pop = document.getElementById('headerSearchPopover');
+  if (pop) pop.style.display = 'none';
   loadFund(code, name);
 };
 
