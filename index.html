@@ -2103,8 +2103,14 @@
       <div class="section-title" style="margin-bottom:16px;">Historical NAV Downloader</div>
       <div class="ptp-card">
 
-        <!-- Date filter -->
-        <div class="swp-refill-box" style="margin-bottom:18px;">
+        <!-- Mode toggle -->
+        <div style="display:flex;gap:8px;margin-bottom:18px;">
+          <button id="navdl-mode-range" class="swp-mode-btn active-mode" onclick="navDlSetMode('range')" style="flex:1;">Date Range (per-fund history)</button>
+          <button id="navdl-mode-dates" class="swp-mode-btn" onclick="navDlSetMode('dates')" style="flex:1;">Specific Dates (fund × date matrix)</button>
+        </div>
+
+        <!-- Date filter (Range mode) -->
+        <div id="navdl-range-section" class="swp-refill-box" style="margin-bottom:18px;">
           <div style="font-family:var(--mono);font-size:9px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">Date Filter <span style="color:var(--text3);">(leave blank for full history)</span></div>
           <div class="input-row" style="margin-bottom:0;flex-wrap:wrap;">
             <div class="input-group">
@@ -2121,6 +2127,14 @@
           </div>
         </div>
 
+        <!-- Specific dates (Dates mode) -->
+        <div id="navdl-dates-section" class="swp-refill-box" style="margin-bottom:18px;display:none;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Dates <span style="color:var(--text3);">(up to 10 — matches nearest available NAV within 7 days)</span></div>
+          <div style="font-family:var(--mono);font-size:9.5px;color:var(--text3);margin-bottom:12px;">Fetches each fund's NAV history once, then reads all requested dates locally — not a separate request per date.</div>
+          <div id="navDlDateSlots" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+          <button class="btn btn-secondary" onclick="navDlAddDate()" id="navDlAddDateBtn">+ Add Date</button>
+        </div>
+
         <!-- Fund slots -->
         <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Funds</div>
         <div id="navDlSlots"></div>
@@ -2128,12 +2142,16 @@
         <!-- Action buttons -->
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px;">
           <button class="btn btn-secondary" onclick="navDlAddFund()" id="navDlAddBtn">+ Add Fund</button>
-          <button class="btn-export csv" onclick="navDlDownloadAll('csv')" style="padding:7px 14px;">⬇ All CSV</button>
-          <button class="btn-export xl"  onclick="navDlDownloadAll('xlsx')" style="padding:7px 14px;">⬇ All Excel</button>
+          <span id="navdl-range-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn-export csv" onclick="navDlDownloadAll('csv')" style="padding:7px 14px;">⬇ All CSV</button>
+            <button class="btn-export xl"  onclick="navDlDownloadAll('xlsx')" style="padding:7px 14px;">⬇ All Excel</button>
+          </span>
+          <button id="navdl-fetch-matrix-btn" class="btn btn-primary" onclick="navDlFetchMatrix()" style="display:none;">▶ Fetch Matrix</button>
         </div>
 
         <!-- Status -->
         <div id="navDlStatus" style="margin-top:16px;"></div>
+        <div id="navDlMatrixResult" style="margin-top:16px;"></div>
 
       </div>
     </div>
@@ -9732,20 +9750,35 @@ async function loadWatchlistMonitor() {
   ct.innerHTML = addHTML + `<div class="loading-wrap"><div class="spinner"></div><span>Fetching NAV data for ${items.length} funds…</span></div>`;
 
   try {
-    // Deduplicate benchmarks
+    // Deduplicate benchmarks. Use allSettled, not all — a single flaky fetch
+    // (truncated response on a slow connection, etc.) shouldn't take down
+    // every other fund/benchmark that loaded fine. calc1Day() already
+    // returns null for a missing navArr, which the row renderer already
+    // shows as "—", so leaving a failed entry out of *Nav is safe.
     const benchCodes = [...new Set(items.map(f => f.benchCode).filter(Boolean))];
     const benchNav = {};
-    await Promise.all(benchCodes.map(async bc => {
+    const benchFailed = [];
+    (await Promise.allSettled(benchCodes.map(async bc => {
       const d = await getNav(bc);
       benchNav[bc] = d.data.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) })).filter(n => !isNaN(n.nav)).reverse();
-    }));
+    }))).forEach((r, i) => { if (r.status === 'rejected') benchFailed.push(benchCodes[i]); });
 
     // Fetch all fund NAVs (parallel)
     const fundNav = {};
-    await Promise.all(items.map(async f => {
+    const fundFailed = [];
+    (await Promise.allSettled(items.map(async f => {
       const d = await getNav(f.schemeCode);
       fundNav[f.schemeCode] = d.data.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) })).filter(n => !isNaN(n.nav)).reverse();
-    }));
+    }))).forEach((r, i) => { if (r.status === 'rejected') fundFailed.push(items[i]); });
+
+    const fetchWarnBanner = (fundFailed.length || benchFailed.length) ? `
+      <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(255,153,0,0.08);border:1px solid rgba(255,153,0,0.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-family:var(--mono);font-size:11px;">
+        <span style="color:var(--warn);font-size:16px;line-height:1;">⚠</span>
+        <div>
+          <div style="color:var(--warn);font-weight:600;margin-bottom:4px;">${fundFailed.length + benchFailed.length} item${(fundFailed.length+benchFailed.length)>1?'s':''} failed to load</div>
+          <div style="color:var(--text3);line-height:1.5;">Likely a slow/interrupted connection, not a data problem — ${fundFailed.map(f=>f.schemeName).join(', ')}${fundFailed.length&&benchFailed.length?', ':''}${benchFailed.length?benchFailed.length+' benchmark(s)':''} showed "—" below. Refresh the page to retry.</div>
+        </div>
+      </div>` : '';
 
     const now = new Date();
     const fmtDate = d => d ? d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : '—';
@@ -9813,7 +9846,7 @@ async function loadWatchlistMonitor() {
 
     const refreshedAt = now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
 
-    ct.innerHTML = addHTML + `
+    ct.innerHTML = addHTML + fetchWarnBanner + `
     <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;">
       <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border2);">
         <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;">
@@ -9839,7 +9872,17 @@ async function loadWatchlistMonitor() {
     </div>`;
 
   } catch(e) {
-    ct.innerHTML = addHTML + `<div style="color:var(--negative);font-family:var(--mono);font-size:12px;padding:16px;">Error: ${e.message}</div>`;
+    // Network/parse failures shouldn't just dump the raw technical message —
+    // give the person something actionable, with the raw error still
+    // available via the browser console for diagnosis if it recurs.
+    const isNetworkish = /json|fetch|network|failed to fetch|unterminated/i.test(e.message || '');
+    const friendly = isNetworkish
+      ? 'Could not load watchlist data — likely a slow or interrupted connection. Try refreshing.'
+      : `Error: ${e.message}`;
+    ct.innerHTML = addHTML + `<div style="color:var(--negative);font-family:var(--mono);font-size:12px;padding:16px;">
+      ${friendly}
+      <div style="margin-top:10px;"><button class="btn btn-secondary" style="font-size:11px;padding:6px 12px;" onclick="loadWatchlistMonitor()">↻ Retry</button></div>
+    </div>`;
     console.error('Watchlist Monitor error:', e);
   }
 }
@@ -10268,6 +10311,54 @@ let _navDlFunds  = [{ id:0, code:'', name:'' }];
 let _navDlNextId = 1;
 const _navDlCache  = {};
 const _navDlTimers = {};
+let _navDlMode = 'range';
+let _navDlDates = [{ id:0, date:'' }];
+let _navDlDateNextId = 1;
+
+window.navDlSetMode = function(mode) {
+  _navDlMode = mode;
+  document.getElementById('navdl-mode-range').classList.toggle('active-mode', mode === 'range');
+  document.getElementById('navdl-mode-dates').classList.toggle('active-mode', mode === 'dates');
+  document.getElementById('navdl-range-section').style.display = mode === 'range' ? '' : 'none';
+  document.getElementById('navdl-dates-section').style.display = mode === 'dates' ? '' : 'none';
+  document.getElementById('navdl-range-actions').style.display = mode === 'range' ? 'flex' : 'none';
+  document.getElementById('navdl-fetch-matrix-btn').style.display = mode === 'dates' ? '' : 'none';
+  document.getElementById('navDlStatus').innerHTML = '';
+  if (mode === 'range') document.getElementById('navDlMatrixResult').innerHTML = '';
+  if (mode === 'dates' && !_navDlDates.length) window.navDlAddDate();
+  navDlRenderDates();
+};
+
+window.navDlAddDate = function() {
+  if (_navDlDates.length >= 10) { showToast('Maximum 10 dates', 'error'); return; }
+  _navDlDates.push({ id: _navDlDateNextId++, date: '' });
+  navDlRenderDates();
+};
+
+window.navDlRemoveDate = function(id) {
+  if (_navDlDates.length <= 1) { showToast('Need at least 1 date', 'error'); return; }
+  _navDlDates = _navDlDates.filter(d => d.id !== id);
+  navDlRenderDates();
+};
+
+window.navDlSetDate = function(id, val) {
+  const d = _navDlDates.find(x => x.id === id);
+  if (d) d.date = val;
+};
+
+function navDlRenderDates() {
+  const c = document.getElementById('navDlDateSlots');
+  if (!c) return;
+  c.innerHTML = _navDlDates.map(d => `
+    <div style="display:flex;align-items:center;gap:4px;">
+      <input class="input-field" type="date" value="${d.date}" onchange="navDlSetDate(${d.id},this.value)" style="width:150px;">
+      ${_navDlDates.length > 1
+        ? `<button onclick="navDlRemoveDate(${d.id})" style="background:transparent;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 4px;">✕</button>`
+        : ''}
+    </div>`).join('');
+  const addBtn = document.getElementById('navDlAddDateBtn');
+  if (addBtn) addBtn.style.opacity = _navDlDates.length >= 10 ? '0.4' : '1';
+}
 
 window.navDlAddFund = function() {
   if (_navDlFunds.length >= 10) { showToast('Maximum 10 funds', 'error'); return; }
@@ -10305,8 +10396,8 @@ function navDlRender() {
           <div id="navdl-meta-${f.id}" style="font-size:9px;font-family:var(--mono);margin-top:3px;
             color:${f.code?'#2dd4a0':'var(--text3)'};">${f.code?'✓ '+f.code:'not selected'}</div>
         </div>
-        <button class="btn-export csv" onclick="navDlDownload(${f.id},'csv')" style="white-space:nowrap;padding:6px 12px;">⬇ CSV</button>
-        <button class="btn-export xl"  onclick="navDlDownload(${f.id},'xlsx')" style="white-space:nowrap;padding:6px 12px;">⬇ Excel</button>
+        <button class="btn-export csv" onclick="navDlDownload(${f.id},'csv')" style="white-space:nowrap;padding:6px 12px;${_navDlMode==='dates'?'display:none;':''}">⬇ CSV</button>
+        <button class="btn-export xl"  onclick="navDlDownload(${f.id},'xlsx')" style="white-space:nowrap;padding:6px 12px;${_navDlMode==='dates'?'display:none;':''}">⬇ Excel</button>
         ${_navDlFunds.length > 1
           ? `<button class="btn btn-secondary" onclick="navDlRemoveFund(${f.id})"
                style="padding:4px 10px;font-size:10px;color:var(--danger);border-color:var(--danger);">✕</button>`
@@ -10473,6 +10564,85 @@ window.navDlDownloadAll = async function(fmt) {
     if (i < valid.length - 1) await new Promise(r => setTimeout(r, 500));
   }
 };
+
+// ── SPECIFIC DATES MODE — fund × date matrix ──────────────────────────────
+// Rate-limiting by design, not just by delay: each fund's NAV history is
+// fetched exactly ONCE regardless of how many dates are requested (up to 10
+// dates all get matched locally against that one response), and requests
+// are sequential with a stagger — never a burst of concurrent calls. The
+// stagger only applies between actual network round-trips; a fund already
+// cached (from this page or elsewhere in the session) is served instantly
+// with no artificial wait.
+window.navDlFetchMatrix = async function() {
+  const funds = _navDlFunds.filter(f => f.code);
+  const dateEntries = _navDlDates.filter(d => d.date);
+  if (!funds.length) { showToast('Select at least 1 fund', 'error'); return; }
+  if (!dateEntries.length) { showToast('Pick at least 1 date', 'error'); return; }
+
+  const dates = dateEntries.map(d => new Date(d.date)).sort((a,b) => a - b);
+  const statusEl = document.getElementById('navDlStatus');
+  const resultEl = document.getElementById('navDlMatrixResult');
+  resultEl.innerHTML = '';
+  const rows = [];
+
+  for (let i = 0; i < funds.length; i++) {
+    statusEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--text3);">Fetching ${i+1} of ${funds.length}: ${funds[i].name.substring(0,50)}…</div>`;
+    const wasCached = !!_navDlCache[funds[i].code];
+    try {
+      const navArr = await navDlFetchNav(funds[i]);
+      const values = dates.map(d => {
+        const match = closestNav(navArr, d, 7);
+        return match ? { nav: match.nav, matchedDate: match.date } : { nav: null, matchedDate: null };
+      });
+      rows.push({ name: funds[i].name, code: funds[i].code, values, ok: true });
+    } catch (e) {
+      rows.push({ name: funds[i].name, code: funds[i].code, values: dates.map(()=>({nav:null, matchedDate:null})), ok: false });
+    }
+    if (!wasCached && i < funds.length - 1) await new Promise(r => setTimeout(r, 400));
+  }
+
+  statusEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--positive);">✓ Fetched ${funds.length} fund${funds.length>1?'s':''} × ${dates.length} date${dates.length>1?'s':''}</div>`;
+  navDlRenderMatrix(rows, dates);
+};
+
+function navDlRenderMatrix(rows, dates) {
+  const resultEl = document.getElementById('navDlMatrixResult');
+  const tid = 'navdlMatrixTbl';
+  const wrapId = tid + '-snap';
+
+  const dateHeaders = dates.map(d => `<th style="text-align:right;">${d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})}</th>`).join('');
+
+  const bodyRows = rows.map(r => {
+    const cells = r.values.map((v, i) => {
+      if (v.nav == null) return `<td style="text-align:right;color:var(--text3);">—</td>`;
+      const requested = dates[i];
+      const gapDays = Math.round(Math.abs(v.matchedDate.getTime() - requested.getTime()) / 86400000);
+      const note = gapDays > 0 ? ` <span style="color:var(--text3);font-size:9px;" title="Nearest available NAV — ${gapDays} day${gapDays>1?'s':''} from requested date">(±${gapDays}d)</span>` : '';
+      return `<td style="text-align:right;">₹${v.nav.toFixed(4)}${note}</td>`;
+    }).join('');
+    return `<tr${r.ok ? '' : ' style="opacity:0.5;"'}>
+      <td style="text-align:left;">${r.name}${r.ok ? '' : ' <span style="color:var(--danger);font-size:9px;">(fetch failed)</span>'}<div style="font-size:9px;color:var(--text3);">${r.code}</div></td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  resultEl.innerHTML = `
+    <div id="${wrapId}">
+    <div class="export-bar">
+      <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
+      <button class="btn-export btn-export-csv"  onclick="exportTableCSV('${tid}','NAV_Matrix')">⬇ CSV</button>
+      <button class="btn-export btn-export-xlsx" onclick="exportTableXLSX('${tid}','NAV_Matrix')">⬇ Excel</button>
+      <button class="btn-export btn-export-png"  onclick="exportSnapshotPNG('${wrapId}','NAV_Matrix')">⬇ PNG</button>
+    </div>
+    <div class="compare-table-wrap">
+      <table class="compare-table" id="${tid}">
+        <thead><tr><th style="text-align:left;">Fund</th>${dateHeaders}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+    <div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:8px;">* (±Nd) = nearest available NAV was N days off the requested date (weekend/holiday) · — = no NAV within 7 days of that date</div>
+    </div>`;
+}
 
 // Init
 setTimeout(() => navDlRender(), 850);
@@ -10899,7 +11069,28 @@ window.cptprExportPDF = function() {
 // ══════════════════════════════════════════════════════
 const CHANGELOG = [
   {
-    version: 'v2.0', date: 'Jun 2026', label: 'latest',
+    version: 'v3.0', date: 'Aug 2026', label: 'latest',
+    changes: [
+      'Fixed 4 wrong benchmark scheme codes: LargeMidcap 250, Midcap 150, Smallcap 250, Nifty 500 — all cross-verified against independent sources',
+      'Fixed XIRR solver blowing up to garbage values (billions of %) on low-volatility funds like liquid/arbitrage — added convergence check',
+      'Fixed SIP redemption always using the latest NAV instead of the requested end date — broke any custom-dated comparison',
+      'Fixed duplicate funds in Category SIP Ranker (upstream data had repeated scheme codes) — added dedup across all fund-list fetches',
+      'Category SIP/PTP Ranker: funds not yet existing at the requested start date no longer silently given an inflated short-period return',
+      'SIP calculators: installments before a fund launch date are now skipped instead of all buying at the same later NAV',
+      'Category SIP/PTP Ranker: Direct is default plan again, Regular still one click away',
+      'Plan-type detection (Direct/Regular/IDCW/Bonus) no longer guesses Regular when a fund name does not clearly say either — flags as unclear and excludes from rankings instead',
+      'Bonus-plan funds now tracked separately — were showing as near-duplicates of the actual Growth option',
+      'New: TER (expense ratio) lookup — Fund page + Category SIP Ranker, with source/confidence shown, mirror fallback if GitHub is blocked',
+      'New: Redemption Tax Estimator tab — equity/debt/hybrid capital gains, current post-Budget-2024 rules',
+      'New: API Status tab — live connectivity check for NAV proxy, mfapi.in direct, search, and TER sources',
+      'New: NAV anomaly detection — flags implausible day-over-day moves (wrong code, bad data) on Fund page, SIP Calc, PTP Calc',
+      'PNG export added to every results table app-wide; fixed export images being cut off mid-row and showing the export buttons themselves',
+      'Watchlist remove button: fixed broken click handler that opened fund info instead of removing; now asks for confirmation first',
+      'Header redesigned: sidebar removed (search + changelog moved into header, collapses to an icon to keep nav to 2 lines)',
+    ]
+  },
+  {
+    version: 'v2.0', date: 'Jun 2026',
     changes: [
       'Category SIP Ranker: PNG + PDF export buttons on results',
       'Category SIP Ranker: ETF, Index, close-ended series, IDCW, dividend, payout, bonus option funds excluded',
