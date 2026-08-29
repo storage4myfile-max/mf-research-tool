@@ -2926,6 +2926,9 @@ function renderFundPage(data) {
   const riskData = calcRisk(navArr);
   const ddData = calcDrawdown(navArr);
   window._currentNavArr = navArr; // store for chart rendering
+  window._currentFundName = meta.scheme_name || selectedFund.schemeName;
+  // New fund loaded — clear any benchmark comparison state from the previous fund
+  window._navChartActiveBenches = [];
 
   // Compute 52W high/low
   const now52 = navArr[navArr.length-1].date;
@@ -3898,17 +3901,66 @@ function renderChartSection() {
         <button class="chart-period-btn" onclick="renderNavChart('5y')">5Y</button>
         <button class="chart-period-btn active" onclick="renderNavChart('all')">All</button>
       </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 2px 10px;">
+        <span style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;white-space:nowrap;">COMPARE VS</span>
+        ${SHARED_BENCH_PILLS.map((p,i) => `<button id="navchart-benchpill-${i}" onclick="window.toggleNavChartBench(${i})"
+          style="padding:3px 10px;border-radius:20px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">${p.label}</button>`).join('')}
+        <span id="navchart-bench-loading" style="display:none;font-size:9px;font-family:var(--mono);color:var(--text3);">loading…</span>
+      </div>
       <div class="chart-canvas-wrap">
         <canvas id="navChartCanvas"></canvas>
       </div>
+      <div id="navchart-bench-note" style="font-size:9px;font-family:var(--mono);color:var(--text3);margin-top:6px;padding:0 2px;"></div>
     </div>`;
 }
 
 let navChartInstance = null;
+window._navChartBenchData = {};   // code -> { navArr, name }
+window._navChartActiveBenches = []; // ordered list of active pill indices
+const NAV_CHART_BENCH_COLORS = ['#e8aa2e', '#5b8def', '#c96ef0', '#ff7a59', '#3ecf8e'];
+
+window.toggleNavChartBench = async function(pillIdx) {
+  const pill = SHARED_BENCH_PILLS[pillIdx];
+  const btn = document.getElementById(`navchart-benchpill-${pillIdx}`);
+  const activeIdx = window._navChartActiveBenches.indexOf(pillIdx);
+
+  if (activeIdx !== -1) {
+    // Turning off
+    window._navChartActiveBenches.splice(activeIdx, 1);
+    if (btn) { btn.style.background = 'transparent'; btn.style.color = 'var(--text3)'; btn.style.borderColor = 'var(--border2)'; }
+    renderNavChart(window._navChartCurrentPeriod || 'all');
+    return;
+  }
+
+  if (window._navChartActiveBenches.length >= 5) { showToast('Up to 5 benchmarks at a time', 'error'); return; }
+
+  window._navChartActiveBenches.push(pillIdx);
+  const color = NAV_CHART_BENCH_COLORS[window._navChartActiveBenches.length - 1];
+  if (btn) { btn.style.background = color; btn.style.color = '#08090e'; btn.style.borderColor = color; }
+
+  if (!window._navChartBenchData[pill.code]) {
+    const loadingEl = document.getElementById('navchart-bench-loading');
+    if (loadingEl) loadingEl.style.display = 'inline';
+    try {
+      const d = await getNav(pill.code);
+      window._navChartBenchData[pill.code] = {
+        navArr: d.data.map(n => ({ date: parseDate(n.date), nav: parseFloat(n.nav) })).filter(n => !isNaN(n.nav)).reverse(),
+        name: pill.label,
+      };
+    } catch (e) {
+      showToast(`Could not load ${pill.label}`, 'error');
+      window._navChartActiveBenches = window._navChartActiveBenches.filter(i => i !== pillIdx);
+      if (btn) { btn.style.background = 'transparent'; btn.style.color = 'var(--text3)'; btn.style.borderColor = 'var(--border2)'; }
+    }
+    if (loadingEl) loadingEl.style.display = 'none';
+  }
+  renderNavChart(window._navChartCurrentPeriod || 'all');
+};
 
 window.renderNavChart = function(period) {
   const navArr = window._currentNavArr;
   if (!navArr || !navArr.length) return;
+  window._navChartCurrentPeriod = period;
 
   // Update active button
   document.querySelectorAll('.chart-period-btn').forEach(b => {
@@ -3933,41 +3985,80 @@ window.renderNavChart = function(period) {
   }
 
   const labels = data.map(n => n.date.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' }));
-  const values = data.map(n => n.nav);
-  const startVal = values[0];
-  const isUp = values[values.length - 1] >= startVal;
-  const color = isUp ? '#00ff9d' : '#ef476f';
-  const colorFaded = isUp ? 'rgba(0,255,157,0.08)' : 'rgba(239,71,111,0.08)';
+  const activeBenches = window._navChartActiveBenches
+    .map(i => ({ pill: SHARED_BENCH_PILLS[i], d: window._navChartBenchData[SHARED_BENCH_PILLS[i].code] }))
+    .filter(x => x.d);
+  const compareMode = activeBenches.length > 0;
+
+  const noteEl = document.getElementById('navchart-bench-note');
+  let datasets, tooltipMode;
+
+  if (!compareMode) {
+    // ── Original single-fund raw NAV view — unchanged from before ──
+    const values = data.map(n => n.nav);
+    const startVal = values[0];
+    const isUp = values[values.length - 1] >= startVal;
+    const color = isUp ? '#00ff9d' : '#ef476f';
+    const colorFaded = isUp ? 'rgba(0,255,157,0.08)' : 'rgba(239,71,111,0.08)';
+    datasets = [{
+      label: 'NAV', data: values, borderColor: color, borderWidth: 1.5,
+      backgroundColor: colorFaded, fill: true, pointRadius: 0, tension: 0.1,
+    }];
+    tooltipMode = 'raw';
+    if (noteEl) noteEl.textContent = '';
+  } else {
+    // ── Comparison mode: normalize fund + each benchmark to % change from
+    // period start, since raw NAV/index levels aren't on comparable scales. ──
+    const fundStart = data[0].nav;
+    const fundPct = data.map(n => ((n.nav - fundStart) / fundStart) * 100);
+    datasets = [{
+      label: window._currentFundName || 'This Fund', data: fundPct,
+      borderColor: '#00ff9d', borderWidth: 2, backgroundColor: 'transparent',
+      fill: false, pointRadius: 0, tension: 0.1,
+    }];
+
+    const unmatched = [];
+    activeBenches.forEach((b, idx) => {
+      const bStart = closestNav(b.d.navArr, data[0].date, 10);
+      if (!bStart) { unmatched.push(b.pill.label); return; }
+      const bPct = data.map(n => {
+        const m = closestNav(b.d.navArr, n.date, 10);
+        return m ? ((m.nav - bStart.nav) / bStart.nav) * 100 : null;
+      });
+      datasets.push({
+        label: b.pill.label, data: bPct,
+        borderColor: NAV_CHART_BENCH_COLORS[idx], borderWidth: 1.5, backgroundColor: 'transparent',
+        fill: false, pointRadius: 0, tension: 0.1, spanGaps: true,
+      });
+    });
+    tooltipMode = 'pct';
+    if (noteEl) noteEl.textContent = unmatched.length
+      ? `⚠ No data available for ${unmatched.join(', ')} over this period`
+      : '% change from period start · not raw NAV — index/fund NAV levels aren\u2019t on the same scale';
+  }
 
   const ctx = document.getElementById('navChartCanvas');
   if (!ctx) return;
 
   if (navChartInstance) { navChartInstance.destroy(); navChartInstance = null; }
 
-  // Compute 52W high/low for annotation
-  const chartHigh52 = filtered.length ? Math.max(...filtered.map(n=>n.nav)) : null;
-  const chartLow52  = filtered.length ? Math.min(...filtered.map(n=>n.nav)) : null;
+  // Compute 52W high/low for annotation (raw-NAV mode only — a % returns
+  // series doesn't map onto a "₹ high/low" label meaningfully)
+  const chartHigh52 = (!compareMode && filtered.length) ? Math.max(...filtered.map(n=>n.nav)) : null;
+  const chartLow52  = (!compareMode && filtered.length) ? Math.min(...filtered.map(n=>n.nav)) : null;
 
   navChartInstance = new Chart(ctx, {
     type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        data: values,
-        borderColor: color,
-        borderWidth: 1.5,
-        backgroundColor: colorFaded,
-        fill: true,
-        pointRadius: 0,
-        tension: 0.1,
-      }]
-    },
+    data: { labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: compareMode,
+          labels: { color: '#94a3b8', font: { family: 'IBM Plex Mono', size: 10 }, boxWidth: 12, padding: 12 }
+        },
         tooltip: {
           backgroundColor: '#1a2335',
           borderColor: '#1e2d45',
@@ -3976,12 +4067,14 @@ window.renderNavChart = function(period) {
           bodyColor: '#e2e8f0',
           titleFont: { family: 'IBM Plex Mono', size: 10 },
           bodyFont: { family: 'IBM Plex Mono', size: 12 },
-          callbacks: {
+          callbacks: tooltipMode === 'raw' ? {
             label: ctx => `NAV: ₹${ctx.parsed.y.toFixed(4)}`,
             afterLabel: ctx => {
-              const pct = ((ctx.parsed.y - startVal) / startVal * 100).toFixed(2);
+              const pct = ((ctx.parsed.y - data[0].nav) / data[0].nav * 100).toFixed(2);
               return `Return: ${pct > 0 ? '+' : ''}${pct}%`;
             }
+          } : {
+            label: ctx => ctx.parsed.y == null ? `${ctx.dataset.label}: no data` : `${ctx.dataset.label}: ${ctx.parsed.y > 0 ? '+' : ''}${ctx.parsed.y.toFixed(2)}%`
           }
         },
         annotation: {
@@ -4018,7 +4111,7 @@ window.renderNavChart = function(period) {
           ticks: {
             color: '#4a5568',
             font: { family: 'IBM Plex Mono', size: 9 },
-            callback: v => '₹' + v.toFixed(0)
+            callback: v => compareMode ? (v > 0 ? '+' : '') + v.toFixed(0) + '%' : '₹' + v.toFixed(0)
           },
           grid: { color: '#1e2d45' },
           border: { color: '#1e2d45' }
