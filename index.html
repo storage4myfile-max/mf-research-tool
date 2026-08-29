@@ -1714,19 +1714,6 @@
           </div>
         </div>
 
-        <!-- PERIOD SHORTCUTS -->
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
-          <span style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;">QUICK PERIOD:</span>
-          <button class="chart-period-btn" onclick="setChartPeriod('1m')">1M</button>
-          <button class="chart-period-btn" onclick="setChartPeriod('3m')">3M</button>
-          <button class="chart-period-btn" onclick="setChartPeriod('6m')">6M</button>
-          <button class="chart-period-btn" onclick="setChartPeriod('1y')">1Y</button>
-          <button class="chart-period-btn" onclick="setChartPeriod('2y')">2Y</button>
-          <button class="chart-period-btn" onclick="setChartPeriod('3y')">3Y</button>
-          <button class="chart-period-btn" onclick="setChartPeriod('5y')">5Y</button>
-          <button class="chart-period-btn" onclick="setChartPeriod('all')">All</button>
-        </div>
-
         <!-- FUND SLOTS -->
         <div style="margin-bottom:12px;font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;">Funds to Plot</div>
         <div id="chartcmpFundSlots"></div>
@@ -1740,6 +1727,17 @@
       <!-- CHART AREA -->
       <div id="chartCmpResult" style="margin-top:0;">
         <div class="nav-chart-wrap" style="margin-top:0;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+            <span style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;">QUICK PERIOD:</span>
+            <button class="chart-period-btn" onclick="setChartPeriod('1m')">1M</button>
+            <button class="chart-period-btn" onclick="setChartPeriod('3m')">3M</button>
+            <button class="chart-period-btn" onclick="setChartPeriod('6m')">6M</button>
+            <button class="chart-period-btn" onclick="setChartPeriod('1y')">1Y</button>
+            <button class="chart-period-btn" onclick="setChartPeriod('2y')">2Y</button>
+            <button class="chart-period-btn" onclick="setChartPeriod('3y')">3Y</button>
+            <button class="chart-period-btn" onclick="setChartPeriod('5y')">5Y</button>
+            <button class="chart-period-btn" onclick="setChartPeriod('all')">All</button>
+          </div>
           <div id="chartCmpLegend" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;min-height:20px;"></div>
           <div class="chart-canvas-wrap" style="height:400px;">
             <canvas id="chartCmpCanvas"></canvas>
@@ -5950,6 +5948,13 @@ window.setChartPeriod = function(period) {
     document.getElementById('chartFrom').value = from.toISOString().split('T')[0];
   }
   document.getElementById('chartTo').value = today.toISOString().split('T')[0];
+  // Re-plot immediately with the new period — no separate "Plot Chart" click
+  // needed. Only auto-plots if there's already something to plot (funds
+  // and/or a benchmark picked); otherwise buildCompareChart's own validation
+  // shows the normal "add a fund" prompt, same as clicking Plot manually.
+  const hasFunds = slotState.chartcmp.slots.some(s => s.code);
+  const hasBench = !!_benchState['chart'].code;
+  if (hasFunds || hasBench) window.buildCompareChart();
 }
 
 window.buildCompareChart = async function() {
