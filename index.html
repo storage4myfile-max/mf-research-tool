@@ -2403,31 +2403,36 @@ window.runAPIStatusCheck = async function() {
   const checks = [
     {
       label: 'NAV Proxy — fund list',
-      detail: 'mfapi-proxy.storage4myfile.workers.dev/mf',
+      detail: 'Full fund list (name + code for every scheme)',
+      url: 'https://mfapi-proxy.storage4myfile.workers.dev/mf',
       run: () => _timedFetch('https://mfapi-proxy.storage4myfile.workers.dev/mf'),
       validate: r => Array.isArray(r.data) && r.data.length > 1000,
     },
     {
       label: 'NAV Proxy — fund detail',
-      detail: `mfapi-proxy.storage4myfile.workers.dev/mf/${API_STATUS_TEST_CODE}`,
+      detail: 'Full NAV history for one fund (Nifty 50 TRI, used as a stable test case)',
+      url: `https://mfapi-proxy.storage4myfile.workers.dev/mf/${API_STATUS_TEST_CODE}`,
       run: () => _timedFetch(`https://mfapi-proxy.storage4myfile.workers.dev/mf/${API_STATUS_TEST_CODE}`),
       validate: r => r.data && Array.isArray(r.data.data) && r.data.data.length > 0,
     },
     {
       label: 'NAV Proxy — search endpoint',
-      detail: 'mfapi-proxy.storage4myfile.workers.dev/mf/search?q=hdfc (used by ISIN Lookup, fund search everywhere)',
+      detail: 'Used by ISIN Lookup and fund search everywhere in the tool',
+      url: 'https://mfapi-proxy.storage4myfile.workers.dev/mf/search?q=hdfc',
       run: () => _timedFetch('https://mfapi-proxy.storage4myfile.workers.dev/mf/search?q=hdfc'),
       validate: r => Array.isArray(r.data) && r.data.length > 0,
     },
     {
       label: 'mfapi.in — direct (bypassing proxy)',
-      detail: `api.mfapi.in/mf/${API_STATUS_TEST_CODE} — often blocked by browser CORS policy even when mfapi.in is healthy (likely why the proxy exists); a "Failed" here alone doesn't mean mfapi.in is down`,
+      detail: 'Often blocked by browser CORS policy even when mfapi.in is healthy (likely why the proxy exists) — a "Failed" here alone doesn\u2019t mean mfapi.in is down',
+      url: `https://api.mfapi.in/mf/${API_STATUS_TEST_CODE}`,
       run: () => _timedFetch(`https://api.mfapi.in/mf/${API_STATUS_TEST_CODE}`),
       validate: r => r.data && Array.isArray(r.data.data) && r.data.data.length > 0,
     },
     {
       label: 'TER data source',
-      detail: 'AMFI TER mirror (GitHub / jsDelivr / statically.io)',
+      detail: 'AMFI TER mirror — tries GitHub, then jsDelivr, then statically.io',
+      urls: TER_SOURCES,
       run: async () => {
         const t0 = performance.now();
         try {
@@ -2451,12 +2456,21 @@ window.runAPIStatusCheck = async function() {
   const rows = results.map(r => {
     const color = r.passed ? 'var(--positive)' : (r.stale ? 'var(--warn, #d9a441)' : 'var(--danger)');
     const statusText = r.passed ? '✓ OK' : (r.stale ? '⏱ Using stale cache' : '✕ Failed');
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border:1px solid var(--border2);border-radius:8px;margin-bottom:8px;background:var(--surface2);">
-      <div>
+    const urlList = r.urls || (r.url ? [r.url] : []);
+    const copyButtons = urlList.map((u, i) => `
+      <button onclick="navigator.clipboard.writeText('${u}').then(()=>showToast('Link copied — paste into your browser','success'))"
+        title="Copy link to check in your browser"
+        style="background:transparent;border:1px solid var(--border2);border-radius:5px;padding:2px 7px;cursor:pointer;color:var(--text3);font-family:var(--mono);font-size:9px;margin-top:4px;margin-right:4px;white-space:nowrap;"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text3)'">
+        ⧉ Copy Link${urlList.length > 1 ? ' ' + (i+1) : ''}
+      </button>`).join('');
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 14px;border:1px solid var(--border2);border-radius:8px;margin-bottom:8px;background:var(--surface2);gap:10px;">
+      <div style="min-width:0;">
         <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);">${r.label}</div>
         <div style="font-family:var(--mono);font-size:9.5px;color:var(--text3);margin-top:2px;">${r.detail}${r.error ? ' · ' + r.error : ''}</div>
+        ${copyButtons ? `<div style="display:flex;flex-wrap:wrap;">${copyButtons}</div>` : ''}
       </div>
-      <div style="text-align:right;">
+      <div style="text-align:right;flex-shrink:0;">
         <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:${color};">${statusText}</div>
         <div style="font-family:var(--mono);font-size:9.5px;color:var(--text3);margin-top:2px;">${r.ms}ms</div>
       </div>
