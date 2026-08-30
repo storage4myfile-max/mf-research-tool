@@ -2376,17 +2376,23 @@ async function getNav(schemeCode) {
 // since the whole point is to reflect the actual conditions the person is
 // using the tool under, which a server-side check couldn't tell them.
 const API_STATUS_TEST_CODE = '120716'; // Nifty 50 TRI — used as a benchmark elsewhere, known-stable
+const API_STATUS_TIMEOUT_MS = 15000;
 async function _timedFetch(url, opts) {
   const t0 = performance.now();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_STATUS_TIMEOUT_MS);
   try {
-    const res = await fetch(url, opts);
+    const res = await fetch(url, { ...opts, signal: controller.signal });
     const ms = Math.round(performance.now() - t0);
     if (!res.ok) return { ok: false, ms, error: 'HTTP ' + res.status };
     const data = await res.json().catch(() => null);
     return { ok: true, ms, data };
   } catch (e) {
     const ms = Math.round(performance.now() - t0);
-    return { ok: false, ms, error: e.message || 'Network error' };
+    const timedOut = e.name === 'AbortError';
+    return { ok: false, ms, error: timedOut ? `Timed out after ${API_STATUS_TIMEOUT_MS/1000}s` : (e.message || 'Network error') };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -2415,7 +2421,7 @@ window.runAPIStatusCheck = async function() {
     },
     {
       label: 'mfapi.in — direct (bypassing proxy)',
-      detail: `api.mfapi.in/mf/${API_STATUS_TEST_CODE}`,
+      detail: `api.mfapi.in/mf/${API_STATUS_TEST_CODE} — often blocked by browser CORS policy even when mfapi.in is healthy (likely why the proxy exists); a "Failed" here alone doesn't mean mfapi.in is down`,
       run: () => _timedFetch(`https://api.mfapi.in/mf/${API_STATUS_TEST_CODE}`),
       validate: r => r.data && Array.isArray(r.data.data) && r.data.data.length > 0,
     },
@@ -2459,20 +2465,39 @@ window.runAPIStatusCheck = async function() {
 
   const allOk = results.every(r => r.passed);
   const byLabel = label => results.find(r => r.label === label);
-  const proxyFailed = !byLabel('NAV Proxy — fund list').passed || !byLabel('NAV Proxy — fund detail').passed;
-  const searchFailed = !byLabel('NAV Proxy — search endpoint').passed;
-  const directFailed = !byLabel('mfapi.in — direct (bypassing proxy)').passed;
+  const listR   = byLabel('NAV Proxy — fund list');
+  const detailR = byLabel('NAV Proxy — fund detail');
+  const searchR = byLabel('NAV Proxy — search endpoint');
+  const terR    = byLabel('TER data source');
+  // Deliberately NOT using the "mfapi.in direct" result to drive this
+  // diagnosis — a browser fetch straight to api.mfapi.in is commonly
+  // blocked by CORS policy regardless of whether mfapi.in is actually up
+  // (likely the whole reason the proxy exists), and that looks identical
+  // to a real outage from browser JS. Using it here would give a
+  // confidently wrong "your network is down" verdict on a completely
+  // healthy connection. TER's mirrors (GitHub/jsDelivr/statically.io) are
+  // genuinely unrelated third-party domains, so failing alongside the
+  // proxy is a much more reliable signal of a real device/network issue.
+  const proxyCoreFailed = !detailR.passed && !searchR.passed;
+  const listOnlyFailed  = !listR.passed && detailR.passed && searchR.passed;
+  const everythingFailed = !detailR.passed && !searchR.passed && !terR.passed;
+
   let diagnosis;
   if (allOk) {
     diagnosis = { text: 'Everything reachable — NAV data, XIRR calcs, fund search, and TER lookups should all work normally.', color: 'var(--positive)' };
-  } else if (proxyFailed && !directFailed) {
-    diagnosis = { text: 'The proxy worker is down or unreachable, but mfapi.in itself is fine — NAV data will fail on this tool specifically until the proxy recovers.', color: 'var(--danger)' };
-  } else if (proxyFailed && directFailed) {
-    diagnosis = { text: 'Both the proxy and mfapi.in directly are unreachable from this device — likely a network/connectivity issue on this end, not the service itself.', color: 'var(--danger)' };
-  } else if (searchFailed) {
+  } else if (everythingFailed) {
+    diagnosis = { text: 'Nothing is reachable right now, including unrelated third-party domains (TER mirrors) — this points to a connectivity issue on this device/network, not any one service being down.', color: 'var(--danger)' };
+  } else if (listOnlyFailed) {
+    const slowDetail = detailR.ms > 10000 ? ` Fund detail also took unusually long (${(detailR.ms/1000).toFixed(0)}s) — the proxy may be under load right now.` : '';
+    diagnosis = { text: `The bulk fund-list endpoint (mf/) is slow or timing out, but individual fund lookups and search both work fine — this mainly affects the first-time full-list load and search's fallback path, not day-to-day Fund/SIP/PTP calculations.${slowDetail}`, color: 'var(--warn, #d9a441)' };
+  } else if (proxyCoreFailed) {
+    diagnosis = { text: 'The proxy worker itself appears down or unreachable — NAV data, search, and fund lookups will fail on this tool until it recovers.', color: 'var(--danger)' };
+  } else if (!searchR.passed) {
     diagnosis = { text: 'The search endpoint specifically is down — this breaks ISIN Lookup and fund search everywhere, even though NAV data itself may be fine. Search falls back to loading the full fund list, which is slower but should still work.', color: 'var(--warn, #d9a441)' };
+  } else if (!terR.passed) {
+    diagnosis = { text: 'NAV data and search are fine — only TER (expense ratio) lookups are affected right now.', color: 'var(--warn, #d9a441)' };
   } else {
-    diagnosis = { text: 'NAV data is fine; check the individual failed row above for what\'s affected.', color: 'var(--warn, #d9a441)' };
+    diagnosis = { text: 'Core NAV data and search are fine; check the individual row above for what\u2019s affected.', color: 'var(--warn, #d9a441)' };
   }
 
   el.innerHTML = `
