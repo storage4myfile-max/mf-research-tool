@@ -33,6 +33,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&family=Noto+Serif+Devanagari:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -2331,24 +2332,30 @@ async function searchFunds(q) {
     const r = await fetch(`https://mfapi-proxy.storage4myfile.workers.dev/mf/search?q=${encodeURIComponent(q)}`);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
-    if (Array.isArray(data) && data.length > 0) return _filterStale(data).slice(0, 30);
     if (!Array.isArray(data)) throw new Error('Malformed response');
-    // data is a valid empty array — genuinely no matches, not a failure
+    if (data.length > 0) return _filterStale(data).slice(0, 30);
+    // Empty-but-valid response — don't fully trust this as "no matches" on
+    // its own. The /mf/search endpoint has been seen missing genuine
+    // matches for some AMC names (e.g. "bandhan") even though those funds
+    // are present in the full /mf list — so an empty result here still
+    // falls through to a local cross-check below, rather than returning
+    // immediately.
   } catch(e) { searchEndpointFailed = true; }
 
-  // Fallback: filter from cached list. If it's empty too (e.g. this is the
-  // first thing the person searched this session, on a page like ISIN Lookup
-  // that doesn't pre-load it), fetch+cache the full list once rather than
-  // silently returning nothing — a real failure should still find results
-  // if the underlying data is reachable at all, just via a slower path.
+  // Fallback / cross-check: filter from cached list. If it's empty too
+  // (e.g. this is the first thing the person searched this session, on a
+  // page like ISIN Lookup that doesn't pre-load it), fetch+cache the full
+  // list once rather than silently returning nothing — a real failure, or
+  // a search-endpoint miss, should still find results if the underlying
+  // data is reachable at all, just via a slower path.
   if (allFunds.length === 0) {
-    if (!searchEndpointFailed) return []; // search endpoint itself said "no matches", trust that
     try {
       const r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf');
       if (!r.ok) throw new Error('HTTP ' + r.status);
       allFunds = _dedupeFundList(await r.json());
     } catch (e) {
-      throw new Error('Fund search is unreachable right now — check API Status'); // let caller surface this
+      if (searchEndpointFailed) throw new Error('Fund search is unreachable right now — check API Status');
+      return []; // search endpoint said no matches, and we can't cross-check right now — trust it
     }
   }
   const ql = q.toLowerCase();
@@ -2804,6 +2811,20 @@ function initSearchListener() {
 }
 // Init search on page load
 setTimeout(initSearchListener, 500);
+
+// Proactively warm the full fund list in the background, low priority, so
+// that searchFunds()'s fallback (used when the fast /mf/search endpoint
+// comes back empty for a genuine match, e.g. it's been seen missing some
+// AMC names) doesn't have to download the whole list on-demand the first
+// time someone hits that path — it's already cached and ready, making the
+// fallback an instant local filter instead of a multi-second fetch.
+setTimeout(async () => {
+  if (allFunds.length > 0) return; // already loaded by something else
+  try {
+    const r = await fetch('https://mfapi-proxy.storage4myfile.workers.dev/mf');
+    if (r.ok) allFunds = _dedupeFundList(await r.json());
+  } catch (e) { /* silent — searchFunds() will still fetch on-demand if this didn't warm it */ }
+}, 2000);
 
 window.toggleHeaderSearch = function() {
   const pop = document.getElementById('headerSearchPopover');
@@ -6015,7 +6036,7 @@ window.buildCompareChart = async function() {
     const filtered = s.navArr.filter(n => n.date.getTime() >= commonStart);
     const baseNav = filtered[0]?.nav || 1;
     const dataPoints = filtered.map(n => ({
-      x: n.date.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' }),
+      x: n.date.getTime(),
       y: mode === 'indexed' ? parseFloat(((n.nav / baseNav) * 100).toFixed(4)) : parseFloat(n.nav.toFixed(4))
     }));
 
@@ -6095,7 +6116,12 @@ window.buildCompareChart = async function() {
       },
       scales: {
         x: {
-          type: 'category',
+          type: 'time',
+          time: {
+            unit: 'month',
+            tooltipFormat: 'dd MMM yy',
+            displayFormats: { day: 'dd MMM', week: 'dd MMM', month: 'MMM yy', quarter: 'MMM yy', year: 'yyyy' }
+          },
           ticks: { color:'#4a5568', font:{family:'IBM Plex Mono',size:9}, maxTicksLimit:10, maxRotation:0 },
           grid: { color:'#1e2d45' },
           border: { color:'#1e2d45' }
