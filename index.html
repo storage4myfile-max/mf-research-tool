@@ -2930,15 +2930,17 @@ window.removeFromWatchlist = async function(code, e) {
 // watchlist — a destructive action shouldn't fire on a single accidental tap.
 window.confirmRemoveFromWatchlist = function(code, name, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
+  const overlayId = 'wl-remove-confirm-' + Date.now();
   const overlay = document.createElement('div');
+  overlay.id = overlayId;
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;';
   overlay.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:20px 22px;max-width:360px;width:100%;">
       <div style="font-family:var(--mono);font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Remove from watchlist?</div>
       <div style="font-size:13px;color:var(--text);margin-bottom:18px;line-height:1.5;">${name}</div>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button class="btn btn-secondary" style="font-size:12px;padding:7px 14px;" onclick="this.closest('div[style*=\\'position:fixed\\']').remove()">Cancel</button>
-        <button class="btn" style="font-size:12px;padding:7px 14px;background:var(--danger);color:#fff;border:none;" onclick="removeFromWatchlist('${code}');this.closest('div[style*=\\'position:fixed\\']').remove()">Remove</button>
+        <button class="btn btn-secondary" style="font-size:12px;padding:7px 14px;" onclick="document.getElementById('${overlayId}').remove()">Cancel</button>
+        <button class="btn" style="font-size:12px;padding:7px 14px;background:var(--danger);color:#fff;border:none;" onclick="removeFromWatchlist('${code}');document.getElementById('${overlayId}').remove()">Remove</button>
       </div>
     </div>`;
   overlay.addEventListener('click', ev => { if (ev.target === overlay) overlay.remove(); });
