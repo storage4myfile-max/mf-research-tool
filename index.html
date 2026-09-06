@@ -2376,6 +2376,7 @@ async function getNav(schemeCode) {
 // since the whole point is to reflect the actual conditions the person is
 // using the tool under, which a server-side check couldn't tell them.
 const API_STATUS_TEST_CODE = '120716'; // Nifty 50 TRI — used as a benchmark elsewhere, known-stable
+const HOLDINGS_STATUS_TEST_CODE = '119551'; // Aditya Birla Sun Life Banking & PSU Debt Fund — confirmed to return live holdings via this endpoint
 const API_STATUS_TIMEOUT_MS = 15000;
 async function _timedFetch(url, opts) {
   const t0 = performance.now();
@@ -2443,6 +2444,13 @@ window.runAPIStatusCheck = async function() {
         }
       },
       validate: r => r.ok,
+    },
+    {
+      label: 'Portfolio Holdings — beta',
+      detail: 'Third-party holdings mirror (openfin.pocketedge.in via Worker) — not an official AMFI/SEBI feed',
+      url: `https://mfapi-proxy.storage4myfile.workers.dev/holdings/${HOLDINGS_STATUS_TEST_CODE}`,
+      run: () => _timedFetch(`https://mfapi-proxy.storage4myfile.workers.dev/holdings/${HOLDINGS_STATUS_TEST_CODE}`),
+      validate: r => r.data && Array.isArray(r.data.holdings) && r.data.holdings.length > 0,
     },
   ];
 
@@ -2718,6 +2726,353 @@ function terBadgeHTML(terResult, planType) {
     (isStale ? ' · could not reach a live source just now — showing last cached data, may be more than a day old' : '') +
     (isApprox ? ' · approximate name match — verify against AMC factsheet before client use' : '');
   return `<span style="font-family:var(--mono);font-size:10.5px;color:${color};font-weight:600;" title="${title}">${val.toFixed(2)}%${isApprox?' ≈':''}${isStale?' ⏱':''}</span>`;
+}
+
+// ─── PORTFOLIO HOLDINGS LOOKUP ────────────────────────────────
+// Third-party, unverified data source (openfin.pocketedge.in) — not an
+// official AMFI/SEBI feed, and not something with the same track record as
+// mfapi.in. Routed through the same dedicated Cloudflare Worker as the NAV
+// endpoints (mfapi-proxy.storage4myfile.workers.dev/holdings/{amfi_code}),
+// which forwards to openfin.pocketedge.in server-side — no public proxy
+// chain needed since this is trusted infrastructure. Treat this as a beta
+// feature: it's a third-party mirror of AMC portfolio disclosures, not an
+// official AMFI/SEBI feed, so cross-check against the AMC factsheet before
+// client use.
+const HOLDINGS_PROXY_BASE = 'https://mfapi-proxy.storage4myfile.workers.dev/holdings';
+const HOLDINGS_CACHE_HOURS = 24;
+const HOLDINGS_FETCH_TIMEOUT_MS = 12000;
+
+async function _holdingsFetchWithTimeout(url, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    const text = res.ok ? await res.text() : null;
+    return { httpStatus: res.status, ok: res.ok, text };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Returns { status: 'success', data, fetchedAt } | { status: 'not_found', fetchedAt } |
+// { status: 'error', error, fetchedAt }
+async function fetchHoldings(amfiCode, asOfDate) {
+  const cacheKey = `mf_holdings_${amfiCode}_${asOfDate || 'latest'}`;
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey));
+    if (cached && (Date.now() - cached.fetchedAt) < HOLDINGS_CACHE_HOURS * 3600 * 1000) {
+      return cached.result;
+    }
+  } catch (e) { /* ignore corrupt/unavailable cache */ }
+
+  const targetUrl = `${HOLDINGS_PROXY_BASE}/${amfiCode}${asOfDate ? '?as_of=' + asOfDate : ''}`;
+
+  try {
+    const res = await _holdingsFetchWithTimeout(targetUrl, HOLDINGS_FETCH_TIMEOUT_MS);
+    if (res.httpStatus === 404) {
+      // Genuine "scheme not covered" from the underlying API.
+      const result = { status: 'not_found', fetchedAt: Date.now() };
+      try { localStorage.setItem(cacheKey, JSON.stringify({ result, fetchedAt: Date.now() })); } catch(e) {}
+      return result;
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.httpStatus);
+    const data = JSON.parse(res.text);
+    const result = { status: 'success', data, fetchedAt: Date.now() };
+    try { localStorage.setItem(cacheKey, JSON.stringify({ result, fetchedAt: Date.now() })); } catch(e) {}
+    return result;
+  } catch (e) {
+    return { status: 'error', error: e.message || 'Network error', fetchedAt: Date.now() };
+  }
+}
+
+// Field names confirmed against a live response for AMFI 119551 (Aditya
+// Birla Sun Life Banking & PSU Debt Fund, a debt scheme) on 2026-09-06.
+// Confirmed shape: top-level {holdings[], as_of, member_amfi_codes, meta:
+// {market_value_unit, ...}, scheme: {...}}; each holding row has
+// {instrument, isin, holding_type, industry, rating, quantity, market_value,
+// pct_nav, ...}. `industry` carries the rating-agency+rating string for debt
+// (e.g. "CRISIL AAA") since `rating` itself was null throughout; equity-fund
+// responses haven't been checked yet and may populate `industry` with an
+// actual sector name instead — re-verify if holdings look wrong for an
+// equity scheme.
+function _holdingTypeLabel(t) {
+  const map = { debt: 'Debt', equity: 'Equity', money_market: 'Money Market', fund_unit: 'Fund/InvIT/REIT', cash: 'Cash' };
+  return map[t] || (t ? t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Other');
+}
+
+// ─── MONTH-OVER-MONTH HOLDINGS COMPARISON ────────────────────
+// Matches holdings between two snapshots by ISIN where present. Rows
+// without an ISIN (index/stock futures, which roll to a new expiry-dated
+// contract name every period) fall back to the instrument name with any
+// trailing DD/MM/YYYY-style date stripped off, so e.g. "TCS 25/08/2026"
+// and "TCS 22/09/2026" still match as the same underlying position. This
+// also collapses the two identical "Cash" rows (TREPS + net receivables/
+// payables — the API doesn't distinguish them, see holdingsCardHTML notes)
+// into one netted bucket per snapshot, which is the right behavior for a
+// month-over-month comparison anyway.
+function _holdingMatchKey(r) {
+  if (r.isin) return 'ISIN:' + r.isin;
+  const stripped = (r.instrument || '').replace(/\s+\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\s*$/, '').trim().toUpperCase();
+  return 'NAME:' + (stripped || 'UNKNOWN');
+}
+
+function _aggregateHoldingsByKey(rows) {
+  const map = new Map();
+  (rows || []).forEach(r => {
+    const key = _holdingMatchKey(r);
+    const qty = parseFloat(r.quantity);
+    const mval = parseFloat(r.market_value) || 0;
+    const pct = parseFloat(r.pct_nav) || 0;
+    const existing = map.get(key);
+    if (existing) {
+      existing.qty = (isNaN(qty) && existing.qty == null) ? null : (existing.qty || 0) + (isNaN(qty) ? 0 : qty);
+      existing.mval += mval;
+      existing.pct += pct;
+    } else {
+      map.set(key, { name: r.instrument, sector: r.industry || r.rating || null, qty: isNaN(qty) ? null : qty, mval, pct });
+    }
+  });
+  return map;
+}
+
+// Returns { newBuys[], exits[], increased[], decreased[], unchanged[] }.
+// Each row: { name, sector, qtyCur, qtyPrev, qtyDelta, mvalCur, mvalPrev, mvalDelta, pctCur, pctPrev, pctDelta }.
+// Cash-type rows have no meaningful quantity, so those (and anything else
+// without a quantity on both sides) are classified by market-value delta instead.
+function computeHoldingsDiff(curRows, prevRows) {
+  const cur = _aggregateHoldingsByKey(curRows);
+  const prev = _aggregateHoldingsByKey(prevRows);
+  const allKeys = new Set([...cur.keys(), ...prev.keys()]);
+  const newBuys = [], exits = [], increased = [], decreased = [], unchanged = [];
+
+  allKeys.forEach(key => {
+    const c = cur.get(key), p = prev.get(key);
+    const base = c || p;
+    const row = {
+      name: base.name, sector: base.sector,
+      qtyCur: c ? c.qty : null, qtyPrev: p ? p.qty : null,
+      mvalCur: c ? c.mval : 0, mvalPrev: p ? p.mval : 0,
+      pctCur: c ? c.pct : 0, pctPrev: p ? p.pct : 0,
+    };
+    row.mvalDelta = row.mvalCur - row.mvalPrev;
+    row.pctDelta = row.pctCur - row.pctPrev;
+    row.qtyDelta = (row.qtyCur != null && row.qtyPrev != null) ? row.qtyCur - row.qtyPrev : null;
+
+    if (!p) { newBuys.push(row); return; }
+    if (!c) { exits.push(row); return; }
+    const changeMeasure = row.qtyDelta != null ? row.qtyDelta : row.mvalDelta;
+    if (Math.abs(changeMeasure) < 1e-6) unchanged.push(row);
+    else if (changeMeasure > 0) increased.push(row);
+    else decreased.push(row);
+  });
+
+  newBuys.sort((a,b) => b.pctCur - a.pctCur);
+  exits.sort((a,b) => b.pctPrev - a.pctPrev);
+  increased.sort((a,b) => b.pctDelta - a.pctDelta);
+  decreased.sort((a,b) => a.pctDelta - b.pctDelta);
+  return { newBuys, exits, increased, decreased, unchanged };
+}
+
+// Picks a sensible default "previous" date from the scheme's own
+// available_as_of list — the most recent one whose calendar month is
+// earlier than the latest snapshot's, falling back to the next entry in
+// the list if none qualifies (e.g. for fortnightly-disclosure schemes).
+function _pickDefaultPreviousDate(availableDates, latestDate) {
+  if (!Array.isArray(availableDates) || !latestDate) return null;
+  const latest = new Date(latestDate);
+  if (isNaN(latest)) return availableDates.find(d => d !== latestDate) || null;
+  const latestMonthIdx = latest.getFullYear() * 12 + latest.getMonth();
+  for (const d of availableDates) {
+    if (d === latestDate) continue;
+    const dt = new Date(d);
+    if (!isNaN(dt) && (dt.getFullYear() * 12 + dt.getMonth()) < latestMonthIdx) return d;
+  }
+  const idx = availableDates.indexOf(latestDate);
+  if (idx >= 0 && availableDates[idx + 1]) return availableDates[idx + 1];
+  return availableDates.find(d => d !== latestDate) || null;
+}
+
+function _diffRowHTML(r) {
+  const numStr = v => (v >= 0 ? '+' : '') + v.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const pctStr = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+  const deltaColor = v => v > 0 ? 'var(--positive)' : v < 0 ? 'var(--danger)' : 'var(--text3)';
+  return `<tr>
+    <td style="text-align:left;">${r.name || '—'}${r.sector ? `<div style="font-size:9px;color:var(--text3);">${r.sector}</div>` : ''}</td>
+    <td style="text-align:right;">${r.qtyDelta != null ? numStr(r.qtyDelta) : '—'}</td>
+    <td style="text-align:right;color:${deltaColor(r.mvalDelta)};">${numStr(r.mvalDelta)}</td>
+    <td style="text-align:right;color:${deltaColor(r.pctDelta)};">${pctStr(r.pctDelta)}</td>
+  </tr>`;
+}
+
+function holdingsDiffHTML(diff, curAsOf, prevAsOf) {
+  const section = (title, rows) => !rows.length ? '' : `
+    <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin:12px 0 6px;">${title} (${rows.length})</div>
+    <div class="compare-table-wrap">
+      <table class="compare-table" style="width:100%;">
+        <thead><tr><th style="text-align:left;">Instrument</th><th style="text-align:right;">Qty Δ</th><th style="text-align:right;">MV Δ (₹ Lakh)</th><th style="text-align:right;">% NAV Δ</th></tr></thead>
+        <tbody>${rows.map(_diffRowHTML).join('')}</tbody>
+      </table>
+    </div>`;
+
+  const totalChanges = diff.newBuys.length + diff.exits.length + diff.increased.length + diff.decreased.length;
+
+  return `<div style="margin-top:10px;">
+    <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:8px;">
+      Comparing <strong style="color:var(--text2);">${curAsOf}</strong> vs <strong style="color:var(--text2);">${prevAsOf}</strong> · ${totalChanges} changed, ${diff.unchanged.length} unchanged
+    </div>
+    ${totalChanges === 0 ? `<div style="font-size:11px;color:var(--text3);font-family:var(--mono);">No portfolio changes detected between these two dates.</div>` : ''}
+    ${section('New Buys', diff.newBuys)}
+    ${section('Exits', diff.exits)}
+    ${section('Increased', diff.increased)}
+    ${section('Decreased', diff.decreased)}
+    <div style="font-size:9px;font-family:var(--mono);color:var(--text3);margin-top:10px;">
+      Cash-type rows (TREPS, net receivables/payables) aren't distinguished by the source API and are netted into one bucket for comparison, so their "Qty Δ" is shown as market-value change instead. Cross-check against the AMC factsheet before client use.
+    </div>
+  </div>`;
+}
+
+window.compareHoldingsMonth = async function(amfiCode, baseId) {
+  const select = document.getElementById(baseId + '-cmp-select');
+  const resultEl = document.getElementById(baseId + '-cmp-result');
+  if (!select || !resultEl) return;
+  const prevDate = select.value;
+  resultEl.innerHTML = `<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:8px;">Loading ${prevDate}…</div>`;
+  const [curResult, prevResult] = await Promise.all([
+    fetchHoldings(amfiCode),
+    fetchHoldings(amfiCode, prevDate),
+  ]);
+  if (curResult.status !== 'success' || prevResult.status !== 'success') {
+    resultEl.innerHTML = `<div style="font-size:11px;color:var(--danger);font-family:var(--mono);margin-top:8px;">Could not load one of the two snapshots for comparison.</div>`;
+    return;
+  }
+  const diff = computeHoldingsDiff(curResult.data.holdings, prevResult.data.holdings);
+  resultEl.innerHTML = holdingsDiffHTML(diff, curResult.data.as_of, prevResult.data.as_of);
+};
+
+function holdingsCardHTML(result, fundName, amfiCode) {
+  const wrapId = 'holdings-card-' + Math.random().toString(36).slice(2,7);
+
+  if (result.status === 'error') {
+    return `<div id="${wrapId}" style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:16px;font-family:var(--mono);">
+      <div style="font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Portfolio Holdings <span style="color:var(--warn,#d9a441);">· beta</span></div>
+      <div style="font-size:12px;color:var(--danger);">Could not load holdings — ${result.error}. This feature relies on third-party public infrastructure that can be unreliable.</div>
+      <button class="btn btn-secondary" style="font-size:11px;padding:6px 12px;margin-top:10px;" onclick="window.retryHoldings && window.retryHoldings()">↻ Retry</button>
+    </div>`;
+  }
+  if (result.status === 'not_found') {
+    return `<div id="${wrapId}" style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:16px;font-family:var(--mono);">
+      <div style="font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Portfolio Holdings <span style="color:var(--warn,#d9a441);">· beta</span></div>
+      <div style="font-size:12px;color:var(--text3);">Not covered by this data source yet — holdings aren't published here for every AMC. Check the AMC's own factsheet for portfolio disclosure.</div>
+    </div>`;
+  }
+
+  const d = result.data || {};
+  const rows = d.holdings || [];
+  const asOf = d.as_of || '';
+  const memberCodes = d.member_amfi_codes || null;
+  const mvUnit = d.meta?.market_value_unit; // e.g. 'INR_LAKH'
+  const mvLabel = mvUnit === 'INR_LAKH' ? 'Market Value (₹ Lakh)' : 'Market Value';
+
+  // Asset-class breakdown — always derived from rows; the API doesn't return
+  // a top-level allocation summary.
+  let allocation = null;
+  if (rows.length) {
+    const buckets = {};
+    rows.forEach(r => {
+      const cls = _holdingTypeLabel(r.holding_type);
+      const pct = parseFloat(r.pct_nav) || 0;
+      buckets[cls] = (buckets[cls] || 0) + pct;
+    });
+    allocation = Object.entries(buckets).map(([label, pct]) => ({ label, pct }));
+  }
+
+  const sorted = [...rows].sort((a,b) => (parseFloat(b.pct_nav)||0) - (parseFloat(a.pct_nav)||0));
+  const top10 = sorted.slice(0, 10);
+
+  const allocHTML = allocation && allocation.length ? `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:14px;">
+      ${allocation.map(a => `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 10px;">
+          <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">${a.label}</div>
+          <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px;">${a.pct.toFixed(1)}%</div>
+        </div>`).join('')}
+    </div>` : '';
+
+  const top10Rows = top10.map((r,i) => {
+    const name = r.instrument || '—';
+    const pct = parseFloat(r.pct_nav);
+    return `<tr>
+      <td style="padding:5px 10px;font-family:var(--mono);font-size:10px;color:var(--text3);text-align:center;">${i+1}</td>
+      <td style="padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--text);">${name}</td>
+      <td style="padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--text2);text-align:right;">${isNaN(pct)?'—':pct.toFixed(2)+'%'}</td>
+    </tr>`;
+  }).join('');
+
+  const fullTid = wrapId + '-full';
+  const fullRows = sorted.map(r => {
+    const isin = r.isin || '—';
+    const name = r.instrument || '—';
+    const qty = r.quantity;
+    const mval = parseFloat(r.market_value);
+    const pct = parseFloat(r.pct_nav);
+    const sector = r.industry || r.rating || '—';
+    return `<tr>
+      <td style="text-align:left;">${name}</td>
+      <td style="text-align:left;">${isin}</td>
+      <td style="text-align:left;">${sector}</td>
+      <td style="text-align:right;">${qty!=null?Number(qty).toLocaleString('en-IN'):'—'}</td>
+      <td style="text-align:right;">${isNaN(mval)?'—':mval.toLocaleString('en-IN')}</td>
+      <td style="text-align:right;">${isNaN(pct)?'—':pct.toFixed(2)+'%'}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div id="${wrapId}">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+      <div style="font-size:11px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;text-transform:uppercase;">Portfolio Holdings <span style="color:var(--warn,#d9a441);">· beta, third-party source</span></div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--text3);" title="Source: openfin.pocketedge.in via public CORS proxy — not an official AMFI/SEBI feed, unverified reliability. Cross-check against the AMC factsheet before client use.">
+        ${asOf ? 'As of ' + asOf : ''} ⓘ
+      </div>
+    </div>
+    ${memberCodes && memberCodes.length > 1 ? `<div style="font-size:9.5px;font-family:var(--mono);color:var(--text3);margin-bottom:10px;">Shared portfolio across ${memberCodes.length} plan variants (Direct/Regular/Growth/IDCW) of this scheme</div>` : ''}
+    ${allocHTML}
+    ${rows.length === 0 ? `<div style="font-size:11px;color:var(--text3);font-family:var(--mono);">No holdings rows in this response.</div>` : `
+    <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Top 10 Holdings</div>
+    <div class="compare-table-wrap" style="margin-bottom:10px;">
+      <table class="compare-table" style="width:100%;"><tbody>${top10Rows}</tbody></table>
+    </div>
+    <button class="btn btn-secondary" style="font-size:11px;padding:6px 12px;" onclick="document.getElementById('${fullTid}-wrap').style.display=document.getElementById('${fullTid}-wrap').style.display==='none'?'block':'none';this.textContent=this.textContent.includes('Show')?'▲ Hide Full Holdings ('+${rows.length}+')':'▼ Show Full Holdings (${rows.length})'">▼ Show Full Holdings (${rows.length})</button>
+    <div id="${fullTid}-wrap" style="display:none;margin-top:10px;">
+      <div class="export-bar">
+        <span style="font-size:10px;font-family:var(--mono);color:var(--text3);">EXPORT:</span>
+        <button class="btn-export btn-export-csv" onclick="exportTableCSV('${fullTid}','Holdings')">⬇ CSV</button>
+        <button class="btn-export btn-export-xlsx" onclick="exportTableXLSX('${fullTid}','Holdings')">⬇ Excel</button>
+      </div>
+      <div class="compare-table-wrap">
+        <table class="compare-table" id="${fullTid}">
+          <thead><tr><th style="text-align:left;">Instrument</th><th style="text-align:left;">ISIN</th><th style="text-align:left;">Sector/Rating</th><th style="text-align:right;">Qty</th><th style="text-align:right;">${mvLabel}</th><th style="text-align:right;">% NAV</th></tr></thead>
+          <tbody>${fullRows}</tbody>
+        </table>
+      </div>
+    </div>`}
+    ${(() => {
+      const availableDates = (d.available_as_of || []).filter(dt => dt !== asOf);
+      if (!availableDates.length || !amfiCode) return '';
+      const defaultPrev = _pickDefaultPreviousDate(d.available_as_of || [], asOf);
+      return `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border2);">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Compare vs</span>
+          <select id="${wrapId}-cmp-select" style="font-family:var(--mono);font-size:11px;background:var(--surface);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:3px 6px;">
+            ${availableDates.map(dt => `<option value="${dt}" ${dt===defaultPrev?'selected':''}>${dt}</option>`).join('')}
+          </select>
+          <button class="btn btn-secondary" style="font-size:11px;padding:5px 12px;" onclick="window.compareHoldingsMonth && window.compareHoldingsMonth('${amfiCode}','${wrapId}')">Compare</button>
+        </div>
+        <div id="${wrapId}-cmp-result"></div>
+      </div>`;
+    })()}
+    <div style="font-size:9px;font-family:var(--mono);color:var(--text3);margin-top:10px;">
+      Source: openfin.pocketedge.in (unofficial, third-party) · not an AMFI/SEBI feed · verify against the AMC factsheet before client use
+    </div>
+  </div>`;
 }
 
 // ─── NAV ANOMALY DETECTION ──────────────────────────────────
@@ -3090,6 +3445,10 @@ function renderFundPage(data) {
     <div id="metricContent-risk" style="display:none;">${renderRiskSection(riskData)}</div>
     <div id="metricContent-chart" style="display:none;">${renderChartSection()}</div>
     <div id="metricContent-drawdown" style="display:none;">${renderDrawdownSection(navArr)}</div>
+
+    <div id="fundHoldingsSection" style="margin-top:16px;">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);">Loading portfolio holdings…</div>
+    </div>
   `;
 
   // Fetch TER asynchronously so it doesn't block the rest of the page render —
@@ -3104,6 +3463,21 @@ function renderFundPage(data) {
     } catch (e) {
       badge.textContent = 'TER: —';
     }
+  })();
+
+  // Fetch portfolio holdings asynchronously, same pattern as TER above — uses
+  // the AMFI/scheme code already in scope, no new user input needed.
+  (async () => {
+    const holdingsEl = document.getElementById('fundHoldingsSection');
+    if (!holdingsEl) return;
+    const amfiCode = selectedFund.schemeCode;
+    window.retryHoldings = async () => {
+      holdingsEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--text3);">Loading portfolio holdings…</div>`;
+      const result = await fetchHoldings(amfiCode);
+      holdingsEl.innerHTML = holdingsCardHTML(result, meta.scheme_name || selectedFund.schemeName, amfiCode);
+    };
+    const result = await fetchHoldings(amfiCode);
+    holdingsEl.innerHTML = holdingsCardHTML(result, meta.scheme_name || selectedFund.schemeName, amfiCode);
   })();
 }
 
