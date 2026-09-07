@@ -4885,7 +4885,7 @@ async function loadBenchmark(benchCode, startDate, endDate, amt, mode) {
       const years = (en.date - sn.date) / (365.25*86400000);
       const abs = (en.nav/sn.nav - 1)*100;
       const cagr = years >= 1 ? (Math.pow(en.nav/sn.nav, 1/years)-1)*100 : abs;
-      return { cagr, abs, years, startNav: sn.nav, endNav: en.nav, name: bName };
+      return { cagr, abs, years, startNav: sn.nav, endNav: en.nav, name: bName, navArr: bNavArr };
     } else if (mode === 'rolling') {
       return { navArr: bNavArr, name: bName };
     }
