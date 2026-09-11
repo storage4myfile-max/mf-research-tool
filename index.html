@@ -967,6 +967,7 @@
     <div class="nav-tab" onclick="switchPage('isinlookup')">ISIN</div>
     <div class="nav-tab" onclick="switchPage('navdl')">NAV Data</div>
     <div class="nav-tab" onclick="switchPage('taxcalc')">Tax Estimator</div>
+    <div class="nav-tab" onclick="switchPage('clientreport')">Client Report</div>
     <div class="nav-tab" onclick="switchPage('apistatus')">API Status</div>
   </div>
   <div style="display:flex;align-items:center;gap:12px;">
@@ -1037,6 +1038,7 @@
       <div class="mobile-nav-item" id="mnav-lumpsip" onclick="mobileNav('lumpsip')"><span class="mobile-nav-icon">💰</span>Lump+SIP</div>
       <div class="mobile-nav-item" id="mnav-goalcalc" onclick="mobileNav('goalcalc')"><span class="mobile-nav-icon">🎯</span>Goal Calc</div>
       <div class="mobile-nav-item" id="mnav-taxcalc" onclick="mobileNav('taxcalc')"><span class="mobile-nav-icon">🧾</span>Tax Estimator</div>
+      <div class="mobile-nav-item" id="mnav-clientreport" onclick="mobileNav('clientreport')"><span class="mobile-nav-icon">📄</span>Client Report</div>
     </div>
     <div class="mobile-drawer-section">
       <div class="mobile-drawer-label">Portfolio Analysis</div>
@@ -1971,6 +1973,53 @@
       </div>
     </div>
 
+    <!-- CLIENT REPORT GENERATOR PAGE -->
+    <div class="page" id="page-clientreport">
+      <div class="section-title">Client Report Generator</div>
+      <div class="ptp-card">
+        <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:18px;line-height:1.6;">
+          Builds a transparency report (TER, brokerage split, exit load) in VED's letterhead style. TER is auto-fetched per fund via the same lookup used on the Fund page — brokerage %, exit load, lock-in and the narrative fields are yours to fill in.
+        </div>
+
+        <div class="input-row" style="flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <div class="input-group">
+            <label class="input-label">Client Name</label>
+            <input class="input-field" type="text" id="crClientName" placeholder="e.g. Rohit Bansilal Wadhwa" style="width:220px;">
+          </div>
+          <div class="input-group">
+            <label class="input-label">CAN / Folio (optional)</label>
+            <input class="input-field" type="text" id="crClientCAN" placeholder="e.g. CAN-25006IS001" style="width:180px;">
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label class="input-label">As Per Our Conversation</label>
+          <textarea class="input-field" id="crConversation" rows="3" style="width:100%;margin-top:5px;resize:vertical;font-family:var(--mono);font-size:11.5px;">You want to invest in Equity Mutual funds. Your risk appetite is Moderate to Aggressive. Your investment time frame is 5 years.</textarea>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label class="input-label">My Thought Process About Your Portfolio (optional, overall)</label>
+          <textarea class="input-field" id="crThoughtProcess" rows="3" style="width:100%;margin-top:5px;resize:vertical;font-family:var(--mono);font-size:11.5px;" placeholder="Overall portfolio rationale — leave blank to skip this section"></textarea>
+        </div>
+
+        <div style="margin-bottom:12px;font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;">Fund Allocations</div>
+        <div id="crFundRows"></div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="crAddFund()">+ Add Fund</button>
+          <button class="btn btn-primary" onclick="crGenerateReport()">Generate Report</button>
+          <span id="crTotalAmount" style="font-size:11px;font-family:var(--mono);color:var(--accent);"></span>
+        </div>
+
+        <div id="crPreviewWrap" style="display:none;margin-top:28px;">
+          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" onclick="crPrint()">🖨 Print / Save PDF</button>
+            <button class="btn btn-primary" onclick="crExportPNG()">⬇ Download PNG (WhatsApp Status)</button>
+          </div>
+          <div id="crPreview"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- API STATUS / CONNECTIVITY DIAGNOSTICS PAGE -->
     <div class="page" id="page-apistatus">
       <div class="section-title">API Status</div>
@@ -2727,6 +2776,261 @@ function terBadgeHTML(terResult, planType) {
     (isApprox ? ' · approximate name match — verify against AMC factsheet before client use' : '');
   return `<span style="font-family:var(--mono);font-size:10.5px;color:${color};font-weight:600;" title="${title}">${val.toFixed(2)}%${isApprox?' ≈':''}${isStale?' ⏱':''}</span>`;
 }
+
+// ─── CLIENT REPORT GENERATOR ──────────────────────────────
+let crFunds = [];
+let crIdSeq = 1;
+let crTimers = {};
+
+function crDefaultRow() {
+  return {
+    id: crIdSeq++, code: '', name: '', amount: '', ter: null, terConfidence: null, terStale: false,
+    category: '', brokerage: '', exitLoad: '1% if redeemed within 1 month, NIL thereafter', lockIn: 'NIL', reason: '',
+  };
+}
+
+window.crAddFund = function() {
+  crFunds.push(crDefaultRow());
+  crRenderRows();
+};
+
+window.crRemoveFund = function(id) {
+  crFunds = crFunds.filter(f => f.id !== id);
+  crRenderRows();
+};
+
+window.crUpdateField = function(id, field, val) {
+  const f = crFunds.find(x => x.id === id);
+  if (f) f[field] = val;
+  if (field === 'amount') crUpdateTotal();
+};
+
+function crUpdateTotal() {
+  const total = crFunds.reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
+  const el = document.getElementById('crTotalAmount');
+  if (el) el.textContent = total ? `Total: ₹${total.toLocaleString('en-IN')}` : '';
+}
+
+function crMetaLine(r) {
+  if (!r.code) return `<span style="color:var(--text3);">not selected</span>`;
+  const parts = [];
+  if (r.category) parts.push(r.category);
+  if (r.ter != null) {
+    let s = `TER auto-fetched: ${(+r.ter).toFixed(2)}%`;
+    if (r.terConfidence === 'approx') s += ' (approx match — verify against factsheet)';
+    if (r.terStale) s += ' (cached, may not be today\'s)';
+    parts.push(s);
+  } else {
+    parts.push('TER not found in tracker — enter manually below');
+  }
+  return `<span style="color:var(--accent);">${parts.join(' · ')}</span>`;
+}
+
+function crRowHTML(r) {
+  return `
+  <div class="ptp-card" style="margin-bottom:12px;background:var(--surface2);" id="crRow-${r.id}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+      <div style="flex:1;position:relative;">
+        <label class="input-label">Fund</label>
+        <input class="input-field" type="text" id="cr-fundinput-${r.id}" placeholder="Search fund name…" autocomplete="off"
+          value="${(r.name || '').replace(/"/g, '&quot;')}" oninput="crOnFundInput(${r.id},this.value)" style="width:100%;margin-top:4px;">
+        <div id="cr-fundres-${r.id}" class="search-results" style="display:none;position:absolute;z-index:200;width:100%;"></div>
+        <div id="cr-fundmeta-${r.id}" style="font-size:10px;font-family:var(--mono);margin-top:4px;">${crMetaLine(r)}</div>
+      </div>
+      <button onclick="crRemoveFund(${r.id})" title="Remove fund" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:4px 8px;">✕</button>
+    </div>
+    <div class="input-row" style="flex-wrap:wrap;gap:10px;margin-top:10px;">
+      <div class="input-group">
+        <label class="input-label">Amount (₹)</label>
+        <input class="input-field" type="number" id="cr-amount-${r.id}" value="${r.amount}" oninput="crUpdateField(${r.id},'amount',this.value)" style="width:110px;">
+      </div>
+      <div class="input-group">
+        <label class="input-label">TER % (Regular)</label>
+        <input class="input-field" type="number" step="0.01" id="cr-ter-${r.id}" value="${r.ter != null ? r.ter : ''}" oninput="crUpdateField(${r.id},'ter',this.value)" style="width:100px;">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Brokerage to VED (%)</label>
+        <input class="input-field" type="number" step="0.01" id="cr-brokerage-${r.id}" value="${r.brokerage}" oninput="crUpdateField(${r.id},'brokerage',this.value)" style="width:120px;">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Exit Load</label>
+        <input class="input-field" type="text" id="cr-exitload-${r.id}" value="${r.exitLoad.replace(/"/g, '&quot;')}" oninput="crUpdateField(${r.id},'exitLoad',this.value)" style="width:230px;">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Lock-In</label>
+        <input class="input-field" type="text" id="cr-lockin-${r.id}" value="${r.lockIn.replace(/"/g, '&quot;')}" oninput="crUpdateField(${r.id},'lockIn',this.value)" style="width:90px;">
+      </div>
+    </div>
+    <div style="margin-top:10px;">
+      <label class="input-label">Reason for Selection (optional, per fund)</label>
+      <textarea class="input-field" id="cr-reason-${r.id}" rows="2" oninput="crUpdateField(${r.id},'reason',this.value)" style="width:100%;margin-top:4px;resize:vertical;font-family:var(--mono);font-size:11px;">${r.reason}</textarea>
+    </div>
+  </div>`;
+}
+
+function crRenderRows() {
+  const wrap = document.getElementById('crFundRows');
+  if (!wrap) return;
+  if (!crFunds.length) {
+    wrap.innerHTML = `<div style="font-size:11px;font-family:var(--mono);color:var(--text3);padding:10px 0;">No funds added yet — click "+ Add Fund" below.</div>`;
+    crUpdateTotal();
+    return;
+  }
+  wrap.innerHTML = crFunds.map(crRowHTML).join('');
+  crUpdateTotal();
+}
+
+window.crOnFundInput = function(id, val) {
+  const f = crFunds.find(x => x.id === id);
+  if (f) { f.code = ''; f.name = val; f.ter = null; f.terConfidence = null; f.terStale = false; f.category = ''; }
+  const res = document.getElementById(`cr-fundres-${id}`);
+  const meta = document.getElementById(`cr-fundmeta-${id}`);
+  if (!res) return;
+  clearTimeout(crTimers[id]);
+  if (meta) meta.innerHTML = `<span style="color:var(--text3);">not selected</span>`;
+  if (val.trim().length < 2) { res.style.display = 'none'; return; }
+  crTimers[id] = setTimeout(async () => {
+    const results = await searchFunds(val.trim());
+    if (!results.length) { res.style.display = 'none'; return; }
+    res.innerHTML = results.map(r => `
+      <div class="search-result-item" onmousedown="crSelectFund(${id},'${r.schemeCode}',\`${r.schemeName.replace(/`/g, "'")}\`)">
+        <div class="result-name">${r.schemeName}</div>
+        <div class="result-meta">${r.schemeCode}</div>
+      </div>`).join('');
+    res.style.display = 'block';
+  }, 300);
+};
+
+window.crSelectFund = async function(id, code, name) {
+  const f = crFunds.find(x => x.id === id);
+  if (!f) return;
+  f.code = code; f.name = name;
+  const meta = document.getElementById(`cr-fundmeta-${id}`);
+  if (meta) meta.innerHTML = `<span style="color:var(--text3);">fetching TER & category…</span>`;
+  const res = document.getElementById(`cr-fundres-${id}`);
+  if (res) res.style.display = 'none';
+  try {
+    const [navData, terResult] = await Promise.all([
+      getNav(code).catch(() => null),
+      getTER(name),
+    ]);
+    const m = (navData && navData.meta) || {};
+    f.category = m.scheme_category || detectCategory(name) || '';
+    if (terResult && !terResult.unreachable) {
+      f.ter = terResult.regularTER;
+      f.terConfidence = terResult.confidence;
+      f.terStale = !!terResult.stale;
+    } else {
+      f.ter = null;
+    }
+  } catch (e) { /* leave TER null — user can enter manually */ }
+  crRenderRows();
+  const input = document.getElementById(`cr-fundinput-${id}`);
+  if (input) input.value = name;
+};
+
+window.crGenerateReport = function() {
+  const clientName = (document.getElementById('crClientName').value || '').trim();
+  const can = (document.getElementById('crClientCAN').value || '').trim();
+  const conversation = (document.getElementById('crConversation').value || '').trim();
+  const thoughtProcess = (document.getElementById('crThoughtProcess').value || '').trim();
+  const validFunds = crFunds.filter(f => f.name && f.amount);
+  if (!validFunds.length) { showToast('Add at least one fund with an amount', 'error'); return; }
+  const total = validFunds.reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
+  const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const fundBlocks = validFunds.map(f => {
+    const ter = (f.ter !== null && f.ter !== '' && !isNaN(f.ter)) ? parseFloat(f.ter) : null;
+    const brokerage = (f.brokerage !== '' && f.brokerage != null && !isNaN(f.brokerage)) ? parseFloat(f.brokerage) : null;
+    const amc = (ter != null && brokerage != null) ? (ter - brokerage).toFixed(2) : null;
+    return `
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid #ddd;">
+        <div style="font-weight:700;font-size:13px;color:#111;">${f.name}</div>
+        <div style="font-size:11px;color:#333;margin-top:2px;">₹${(parseFloat(f.amount) || 0).toLocaleString('en-IN')}${f.category ? ' · ' + f.category : ''}</div>
+        <table style="width:100%;margin-top:8px;font-size:11px;color:#222;border-collapse:collapse;">
+          <tr><td style="padding:2px 0;width:55%;">TER (Total Expense Ratio)</td><td style="text-align:right;font-weight:600;">${ter != null ? ter.toFixed(2) + '%' : '—'}</td></tr>
+          <tr><td style="padding:2px 0;">Paid to AMC</td><td style="text-align:right;">${amc != null ? amc + '%' : '—'}</td></tr>
+          <tr><td style="padding:2px 0;">Paid to VED Investment</td><td style="text-align:right;">${brokerage != null ? brokerage.toFixed(2) + '%' : '—'}</td></tr>
+          <tr><td style="padding:2px 0;">Exit Load</td><td style="text-align:right;">${f.exitLoad || '—'}</td></tr>
+          <tr><td style="padding:2px 0;">Lock-In</td><td style="text-align:right;">${f.lockIn || '—'}</td></tr>
+        </table>
+        ${f.reason ? `<div style="margin-top:8px;font-size:11px;color:#333;line-height:1.5;"><strong>Reason for selection:</strong> ${f.reason}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  const allocTree = validFunds.map(f => `
+    <div style="text-align:center;flex:1;min-width:120px;">
+      <div style="font-size:11px;color:#333;">${f.name}</div>
+      <div style="font-weight:700;font-size:12px;color:#111;">₹${(parseFloat(f.amount) || 0).toLocaleString('en-IN')}</div>
+    </div>`).join('');
+
+  document.getElementById('crPreview').innerHTML = `
+    <div id="crPreviewDoc" style="background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;padding:28px;max-width:700px;margin:0 auto;border-radius:4px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1b4fd8;padding-bottom:10px;margin-bottom:16px;">
+        <div style="font-size:16px;font-weight:800;color:#1b4fd8;">VED INVESTMENT</div>
+        <div style="text-align:right;font-size:10px;color:#333;">Vivek V Chawla<br>ARN-253228 · EUIN E472276</div>
+      </div>
+      <div style="font-size:11px;color:#333;line-height:1.6;margin-bottom:16px;">
+        Thank you for choosing VED as your preferred investment partner. We are committed to providing you with unbiased and ethical services, staying true to our principles for you and all our clients.
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#111;margin-bottom:6px;">Details of your investment${clientName ? ' — ' + clientName : ''}${can ? ' (' + can + ')' : ''}:</div>
+      <div style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:10px 0 16px;border-bottom:1px solid #ddd;margin-bottom:16px;">
+        ${allocTree}
+        <div style="text-align:center;flex:1;min-width:120px;"><div style="font-size:11px;color:#666;">Total</div><div style="font-weight:800;font-size:13px;color:#111;">₹${total.toLocaleString('en-IN')}</div></div>
+      </div>
+      ${conversation ? `<div style="font-size:12px;font-weight:700;color:#111;margin-bottom:4px;">As Per Our Conversation:</div><div style="font-size:11px;color:#333;line-height:1.6;margin-bottom:16px;">${conversation}</div>` : ''}
+      ${thoughtProcess ? `<div style="font-size:12px;font-weight:700;color:#111;margin-bottom:4px;">My Thought Process About Your Portfolio:</div><div style="font-size:11px;color:#333;line-height:1.6;margin-bottom:16px;">${thoughtProcess}</div>` : ''}
+      <div style="font-size:12px;font-weight:700;color:#111;">TER &amp; Brokerage Details:</div>
+      ${fundBlocks}
+      <div style="margin-top:20px;padding-top:14px;border-top:1px solid #ddd;font-size:10px;color:#555;line-height:1.6;">
+        <strong>Mandatory Disclosure:</strong> "Mutual fund investments are subject to market risks, read all scheme-related documents carefully, before Investing"
+      </div>
+      <div style="margin-top:18px;font-size:11px;color:#333;">
+        Regards,<br><strong>Vivek V Chawla</strong><br>VED Investment (ARN-253228)<br><span style="color:#888;font-size:10px;">${dateStr}</span>
+      </div>
+    </div>`;
+  document.getElementById('crPreviewWrap').style.display = 'block';
+  document.getElementById('crPreviewWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+window.crPrint = function() {
+  const doc = document.getElementById('crPreviewDoc');
+  if (!doc) return;
+  const w = window.open('', '_blank');
+  if (!w) { showToast('Pop-up blocked — allow pop-ups to print', 'error'); return; }
+  w.document.write(`<html><head><title>VED Investment — Client Report</title>
+    <style>body{margin:0;padding:20px;background:#fff;} @media print{body{padding:0;}}</style>
+    </head><body>${doc.outerHTML}</body></html>`);
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
+};
+
+// Exports the WhatsApp Status-sized version (1080x1920, contain-fit so the
+// letterhead is never stretched or distorted — just centered on white).
+window.crExportPNG = async function() {
+  const doc = document.getElementById('crPreviewDoc');
+  if (!doc) return;
+  showToast('Capturing…', '');
+  try {
+    const cap = await html2canvas(doc, { backgroundColor: '#ffffff', scale: 2, useCORS: true, logging: false });
+    const target = document.createElement('canvas');
+    target.width = 1080; target.height = 1920;
+    const ctx = target.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 1080, 1920);
+    const scale = Math.min(1080 / cap.width, 1920 / cap.height);
+    const w = cap.width * scale, h = cap.height * scale;
+    ctx.drawImage(cap, (1080 - w) / 2, (1920 - h) / 2, w, h);
+    const link = document.createElement('a');
+    const cname = ((document.getElementById('crClientName').value || 'client').trim() || 'client').replace(/[^a-zA-Z0-9]/g, '-');
+    link.download = `VED-Report-${cname}-${new Date().toISOString().slice(0, 10)}.png`;
+    link.href = target.toDataURL('image/png');
+    link.click();
+    showToast('PNG downloaded', 'success');
+  } catch (e) {
+    showToast('Export failed', 'error');
+  }
+};
 
 // ─── PORTFOLIO HOLDINGS LOOKUP ────────────────────────────────
 // Third-party, unverified data source (openfin.pocketedge.in) — not an
@@ -5902,7 +6206,7 @@ window.calcRollingMulti = async function() {
 window.switchPage = function(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${page}`)?.classList.add('active');
-  const pages = ['fund','compare','sipcalc','ptpcalc','rollingcalc','stepupcalc','swpcalc','chartcmp','catscanner','lumpsip','goalcalc','corrmatrix','fundmgr','catheatmap','isinlookup','navdl','taxcalc','apistatus'];
+  const pages = ['fund','compare','sipcalc','ptpcalc','rollingcalc','stepupcalc','swpcalc','chartcmp','catscanner','lumpsip','goalcalc','corrmatrix','fundmgr','catheatmap','isinlookup','navdl','taxcalc','clientreport','apistatus'];
   document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', pages[i] === page));
   updateBottomNav(page);
   updateDrawerNav(page);
