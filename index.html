@@ -3102,55 +3102,55 @@ window.crGenerateReport = function() {
     const brokerage = (f.brokerage !== '' && f.brokerage != null && !isNaN(f.brokerage)) ? parseFloat(f.brokerage) : null;
     const amc = (ter != null && brokerage != null) ? (ter - brokerage).toFixed(2) : null;
     return `
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid #ddd;">
-        <div style="font-weight:700;font-size:13px;color:#111;">${f.name}</div>
-        <div style="font-size:11px;color:#333;margin-top:2px;">₹${(parseFloat(f.amount) || 0).toLocaleString('en-IN')}${f.category ? ' · ' + f.category : ''}</div>
-        <table style="width:100%;margin-top:8px;font-size:11px;color:#222;border-collapse:collapse;">
-          <tr><td style="padding:2px 0;width:55%;">TER (Total Expense Ratio)</td><td style="text-align:right;font-weight:600;">${ter != null ? ter.toFixed(2) + '%' : '—'}</td></tr>
-          <tr><td style="padding:2px 0;">Paid to AMC</td><td style="text-align:right;">${amc != null ? amc + '%' : '—'}</td></tr>
-          <tr><td style="padding:2px 0;">Paid to VED Investment</td><td style="text-align:right;">${brokerage != null ? brokerage.toFixed(2) + '%' : '—'}</td></tr>
-          <tr><td style="padding:2px 0;">Exit Load</td><td style="text-align:right;">${f.exitLoad || '—'}</td></tr>
-          <tr><td style="padding:2px 0;">Lock-In</td><td style="text-align:right;">${f.lockIn || '—'}</td></tr>
+      <div style="margin-top:22px;padding-top:16px;border-top:1px solid #ddd;">
+        <div style="font-weight:700;font-size:16px;color:#111;">${f.name}</div>
+        <div style="font-size:13px;color:#333;margin-top:3px;">₹${(parseFloat(f.amount) || 0).toLocaleString('en-IN')}${f.category ? ' · ' + f.category : ''}</div>
+        <table style="width:100%;margin-top:10px;font-size:13px;color:#222;border-collapse:collapse;">
+          <tr><td style="padding:3px 0;width:55%;">TER (Total Expense Ratio)</td><td style="text-align:right;font-weight:600;">${ter != null ? ter.toFixed(2) + '%' : '—'}</td></tr>
+          <tr><td style="padding:3px 0;">Paid to AMC</td><td style="text-align:right;">${amc != null ? amc + '%' : '—'}</td></tr>
+          <tr><td style="padding:3px 0;">Paid to VED Investment</td><td style="text-align:right;">${brokerage != null ? brokerage.toFixed(2) + '%' : '—'}</td></tr>
+          <tr><td style="padding:3px 0;">Exit Load</td><td style="text-align:right;">${f.exitLoad || '—'}</td></tr>
+          <tr><td style="padding:3px 0;">Lock-In</td><td style="text-align:right;">${f.lockIn || '—'}</td></tr>
         </table>
         ${(() => {
           const alts = (f.altFunds || []).filter(a => a.name && a.ter != null);
           if (!alts.length) return '';
-          const items = alts.map(a => `${a.name} — Expense ratio ${(+a.ter).toFixed(2)}%${(a.brokerage !== '' && a.brokerage != null && !isNaN(a.brokerage)) ? ', ' + parseFloat(a.brokerage).toFixed(2) + '% paid to VED' : ''}`).join('; ');
-          return `<div style="margin-top:8px;font-size:10.5px;color:#555;font-style:italic;">(We also recommend the following alternative${alts.length > 1 ? 's' : ''} in this category: ${items})</div>`;
+          const items = alts.map(a => `Expense ratio ${(+a.ter).toFixed(2)}%${(a.brokerage !== '' && a.brokerage != null && !isNaN(a.brokerage)) ? ', ' + parseFloat(a.brokerage).toFixed(2) + '% paid to VED' : ''}`).join('; ');
+          return `<div style="margin-top:10px;font-size:12.5px;color:#555;font-style:italic;">(We also recommend the following alternative${alts.length > 1 ? 's' : ''} in this category: ${items})</div>`;
         })()}
-        ${f.reason ? `<div style="margin-top:8px;font-size:11px;color:#333;line-height:1.5;"><strong>Reason for selection:</strong> ${f.reason}</div>` : ''}
+        ${f.reason ? `<div style="margin-top:10px;font-size:13px;color:#333;line-height:1.55;"><strong>Reason for selection:</strong> ${f.reason}</div>` : ''}
       </div>`;
   }).join('');
 
   const allocTree = validFunds.map(f => `
     <div style="text-align:center;flex:1;min-width:120px;">
-      <div style="font-size:11px;color:#333;">${f.name}</div>
-      <div style="font-weight:700;font-size:12px;color:#111;">₹${(parseFloat(f.amount) || 0).toLocaleString('en-IN')}</div>
+      <div style="font-size:13px;color:#333;">${f.name}</div>
+      <div style="font-weight:700;font-size:14px;color:#111;">₹${(parseFloat(f.amount) || 0).toLocaleString('en-IN')}</div>
     </div>`).join('');
 
   document.getElementById('crPreview').innerHTML = `
-    <div id="crPreviewDoc" style="background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;padding:28px;max-width:700px;margin:0 auto;border-radius:4px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1b4fd8;padding-bottom:10px;margin-bottom:16px;">
-        <div style="font-size:16px;font-weight:800;color:#1b4fd8;">VED INVESTMENT</div>
-        <div style="text-align:right;font-size:10px;color:#333;">Vivek V Chawla<br>ARN-253228 · EUIN E472276</div>
+    <div id="crPreviewDoc" style="background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;padding:32px;max-width:760px;margin:0 auto;border-radius:4px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1b4fd8;padding-bottom:12px;margin-bottom:18px;">
+        <div style="font-size:19px;font-weight:800;color:#1b4fd8;">VED INVESTMENT</div>
+        <div style="text-align:right;font-size:12px;color:#333;">Vivek V Chawla<br>ARN-253228 · EUIN E472276</div>
       </div>
-      <div style="font-size:11px;color:#333;line-height:1.6;margin-bottom:16px;">
+      <div style="font-size:13px;color:#333;line-height:1.6;margin-bottom:18px;">
         Thank you for choosing VED as your preferred investment partner. We are committed to providing you with unbiased and ethical services, staying true to our principles for you and all our clients.
       </div>
-      <div style="font-size:12px;font-weight:700;color:#111;margin-bottom:6px;">Details of your investment${clientName ? ' — ' + clientName : ''}${can ? ' (' + can + ')' : ''}:</div>
-      <div style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:10px 0 16px;border-bottom:1px solid #ddd;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:8px;">Details of your investment${clientName ? ' — ' + clientName : ''}${can ? ' (' + can + ')' : ''}:</div>
+      <div style="display:flex;justify-content:center;gap:18px;flex-wrap:wrap;padding:12px 0 18px;border-bottom:1px solid #ddd;margin-bottom:18px;">
         ${allocTree}
-        <div style="text-align:center;flex:1;min-width:120px;"><div style="font-size:11px;color:#666;">Total</div><div style="font-weight:800;font-size:13px;color:#111;">₹${total.toLocaleString('en-IN')}</div></div>
+        <div style="text-align:center;flex:1;min-width:120px;"><div style="font-size:13px;color:#666;">Total</div><div style="font-weight:800;font-size:15px;color:#111;">₹${total.toLocaleString('en-IN')}</div></div>
       </div>
-      ${conversation ? `<div style="font-size:12px;font-weight:700;color:#111;margin-bottom:4px;">As Per Our Conversation:</div><div style="font-size:11px;color:#333;line-height:1.6;margin-bottom:16px;">${conversation}</div>` : ''}
-      ${thoughtProcess ? `<div style="font-size:12px;font-weight:700;color:#111;margin-bottom:4px;">My Thought Process About Your Portfolio:</div><div style="font-size:11px;color:#333;line-height:1.6;margin-bottom:16px;">${thoughtProcess}</div>` : ''}
-      <div style="font-size:12px;font-weight:700;color:#111;">TER &amp; Brokerage Details:</div>
+      ${conversation ? `<div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">As Per Our Conversation:</div><div style="font-size:13px;color:#333;line-height:1.6;margin-bottom:18px;">${conversation}</div>` : ''}
+      ${thoughtProcess ? `<div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">My Thought Process About Your Portfolio:</div><div style="font-size:13px;color:#333;line-height:1.6;margin-bottom:18px;">${thoughtProcess}</div>` : ''}
+      <div style="font-size:14px;font-weight:700;color:#111;">TER &amp; Brokerage Details:</div>
       ${fundBlocks}
-      <div style="margin-top:20px;padding-top:14px;border-top:1px solid #ddd;font-size:10px;color:#555;line-height:1.6;">
+      <div style="margin-top:22px;padding-top:16px;border-top:1px solid #ddd;font-size:12px;color:#555;line-height:1.6;">
         <strong>Mandatory Disclosure:</strong> "Mutual fund investments are subject to market risks, read all scheme-related documents carefully, before Investing"
       </div>
-      <div style="margin-top:18px;font-size:11px;color:#333;">
-        Regards,<br><strong>Vivek V Chawla</strong><br>VED Investment (ARN-253228)<br><span style="color:#888;font-size:10px;">${dateStr}</span>
+      <div style="margin-top:20px;font-size:13px;color:#333;">
+        Regards,<br><strong>Vivek V Chawla</strong><br>VED Investment (ARN-253228)<br><span style="color:#888;font-size:12px;">${dateStr}</span>
       </div>
     </div>`;
   document.getElementById('crPreviewWrap').style.display = 'block';
@@ -3162,8 +3162,14 @@ window.crPrint = function() {
   if (!doc) return;
   const w = window.open('', '_blank');
   if (!w) { showToast('Pop-up blocked — allow pop-ups to print', 'error'); return; }
-  w.document.write(`<html><head><title>VED Investment — Client Report</title>
-    <style>body{margin:0;padding:20px;background:#fff;} @media print{body{padding:0;}}</style>
+  const cname = ((document.getElementById('crClientName').value || 'Client').trim() || 'Client').replace(/[^a-zA-Z0-9]/g, '-');
+  const dstamp = new Date().toISOString().slice(0, 10);
+  const reportTitle = `VED-Report-${cname}-${dstamp}`;
+  w.document.write(`<html><head><title>${reportTitle}</title>
+    <style>
+      @page { size: A4; margin: 8mm; }
+      body { margin:0; padding:0; background:#fff; }
+    </style>
     </head><body>${doc.outerHTML}</body></html>`);
   w.document.close();
   w.onload = () => { w.focus(); w.print(); };
