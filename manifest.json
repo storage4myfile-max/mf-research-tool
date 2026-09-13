@@ -1,0 +1,19 @@
+{
+  "name": "MF Research Tool — VED Investment",
+  "short_name": "MF Research",
+  "description": "Professional Mutual Fund Research Platform — Returns, Risk, Rolling, SIP Calculator, Category Scanner and more.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0e17",
+  "theme_color": "#0a0e17",
+  "icons": [
+    {
+      "src": "favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
