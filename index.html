@@ -2785,8 +2785,82 @@ let crTimers = {};
 function crDefaultRow() {
   return {
     id: crIdSeq++, code: '', name: '', amount: '', ter: null, terConfidence: null, terStale: false,
-    category: '', brokerage: '', exitLoad: '1% if redeemed within 1 month, NIL thereafter', lockIn: 'NIL', reason: '',
+    category: '', brokerage: '', exitLoad: '1% if redeemed within 1 month, NIL thereafter', exitLoadSavedAt: null, lockIn: 'NIL', reason: '',
+    altFunds: [],
   };
+}
+
+let crAltIdSeq = 1;
+
+function crDefaultAltFund() {
+  return { id: crAltIdSeq++, code: '', name: '', ter: null, terConfidence: null, terStale: false, brokerage: '' };
+}
+
+const EXIT_LOAD_CACHE_KEY = 'ved_exitload_cache_v1';
+
+function crGetExitLoadCache() {
+  try {
+    const raw = localStorage.getItem(EXIT_LOAD_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+
+function crSaveExitLoadCacheObj(cache) {
+  try { localStorage.setItem(EXIT_LOAD_CACHE_KEY, JSON.stringify(cache)); } catch (e) { /* storage unavailable — ignore silently */ }
+}
+
+function crLookupExitLoadDefault(code) {
+  if (!code) return null;
+  const cache = crGetExitLoadCache();
+  return cache[code] || null;
+}
+
+function crExitLoadStatusLine(r) {
+  if (!r.code) return '';
+  if (r.exitLoadSavedAt) {
+    const d = new Date(r.exitLoadSavedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return `<span style="color:var(--accent);">Using saved default for this fund (updated ${d})</span>`;
+  }
+  return `<span style="color:var(--text3);">No saved default yet for this fund — click "Save default" to remember it</span>`;
+}
+
+window.crSaveExitLoadDefault = function(rowId) {
+  const r = crFunds.find(x => x.id === rowId);
+  if (!r || !r.code) { showToast('Select a fund first', 'error'); return; }
+  const input = document.getElementById(`cr-exitload-${rowId}`);
+  const val = input ? input.value : r.exitLoad;
+  const cache = crGetExitLoadCache();
+  cache[r.code] = { text: val, updatedAt: Date.now(), name: r.name };
+  crSaveExitLoadCacheObj(cache);
+  r.exitLoad = val;
+  r.exitLoadSavedAt = cache[r.code].updatedAt;
+  const status = document.getElementById(`cr-exitload-status-${rowId}`);
+  if (status) status.innerHTML = crExitLoadStatusLine(r);
+  showToast('Saved as default exit load for this fund', 'success');
+};
+
+function crAltMetaLine(a) {
+  if (!a.code) return `<span style="color:var(--text3);">not selected</span>`;
+  if (a.ter == null) return `<span style="color:var(--text3);">TER not found — leave blank or check factsheet</span>`;
+  let s = `TER: ${(+a.ter).toFixed(2)}%`;
+  if (a.terConfidence === 'approx') s += ' (approx)';
+  if (a.terStale) s += ' (cached)';
+  return `<span style="color:var(--accent);">${s}</span>`;
+}
+
+function crAltFundHTML(rowId, a) {
+  return `
+  <div style="display:flex;gap:8px;align-items:flex-start;margin-top:6px;position:relative;" id="crAlt-${rowId}-${a.id}">
+    <div style="flex:1;position:relative;">
+      <input class="input-field" type="text" id="cr-altfundinput-${rowId}-${a.id}" placeholder="Search alternate fund…" autocomplete="off"
+        value="${(a.name || '').replace(/"/g, '&quot;')}" oninput="crOnAltFundInput(${rowId},${a.id},this.value)" style="width:100%;">
+      <div id="cr-altfundres-${rowId}-${a.id}" class="search-results" style="display:none;position:absolute;z-index:200;width:100%;"></div>
+      <div style="font-size:9.5px;font-family:var(--mono);margin-top:3px;">${crAltMetaLine(a)}</div>
+    </div>
+    <input class="input-field" type="number" step="0.01" placeholder="VED %" title="Brokerage % paid to VED"
+      id="cr-altbrokerage-${rowId}-${a.id}" value="${a.brokerage}" oninput="crUpdateAltField(${rowId},${a.id},'brokerage',this.value)" style="width:80px;">
+    <button onclick="crRemoveAltFund(${rowId},${a.id})" title="Remove" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 6px;">✕</button>
+  </div>`;
 }
 
 window.crAddFund = function() {
@@ -2852,9 +2926,13 @@ function crRowHTML(r) {
         <label class="input-label">Brokerage to VED (%)</label>
         <input class="input-field" type="number" step="0.01" id="cr-brokerage-${r.id}" value="${r.brokerage}" oninput="crUpdateField(${r.id},'brokerage',this.value)" style="width:120px;">
       </div>
-      <div class="input-group">
+      <div class="input-group" style="min-width:250px;">
         <label class="input-label">Exit Load</label>
-        <input class="input-field" type="text" id="cr-exitload-${r.id}" value="${r.exitLoad.replace(/"/g, '&quot;')}" oninput="crUpdateField(${r.id},'exitLoad',this.value)" style="width:230px;">
+        <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+          <input class="input-field" type="text" id="cr-exitload-${r.id}" value="${r.exitLoad.replace(/"/g, '&quot;')}" oninput="crUpdateField(${r.id},'exitLoad',this.value)" style="flex:1;min-width:150px;">
+          <button onclick="crSaveExitLoadDefault(${r.id})" title="Save this as the default exit load for this fund, for next time" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--accent);cursor:pointer;font-size:11px;padding:6px 8px;white-space:nowrap;">💾 Save default</button>
+        </div>
+        <div id="cr-exitload-status-${r.id}" style="font-size:9.5px;font-family:var(--mono);margin-top:3px;">${crExitLoadStatusLine(r)}</div>
       </div>
       <div class="input-group">
         <label class="input-label">Lock-In</label>
@@ -2864,6 +2942,13 @@ function crRowHTML(r) {
     <div style="margin-top:10px;">
       <label class="input-label">Reason for Selection (optional, per fund)</label>
       <textarea class="input-field" id="cr-reason-${r.id}" rows="2" oninput="crUpdateField(${r.id},'reason',this.value)" style="width:100%;margin-top:4px;resize:vertical;font-family:var(--mono);font-size:11px;">${r.reason}</textarea>
+    </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">
+      <label class="input-label" style="opacity:0.8;">Alternate Funds Disclosure (optional — "we also recommend...")</label>
+      <div id="crAltList-${r.id}">
+        ${(r.altFunds || []).map(a => crAltFundHTML(r.id, a)).join('')}
+      </div>
+      <button class="btn btn-secondary" onclick="crAddAltFund(${r.id})" style="margin-top:6px;font-size:10.5px;padding:5px 10px;">+ Add Alternate Fund</button>
     </div>
   </div>`;
 }
@@ -2905,6 +2990,13 @@ window.crSelectFund = async function(id, code, name) {
   const f = crFunds.find(x => x.id === id);
   if (!f) return;
   f.code = code; f.name = name;
+  const savedDefault = crLookupExitLoadDefault(code);
+  if (savedDefault) {
+    f.exitLoad = savedDefault.text;
+    f.exitLoadSavedAt = savedDefault.updatedAt;
+  } else {
+    f.exitLoadSavedAt = null;
+  }
   const meta = document.getElementById(`cr-fundmeta-${id}`);
   if (meta) meta.innerHTML = `<span style="color:var(--text3);">fetching TER & category…</span>`;
   const res = document.getElementById(`cr-fundres-${id}`);
@@ -2927,6 +3019,69 @@ window.crSelectFund = async function(id, code, name) {
   crRenderRows();
   const input = document.getElementById(`cr-fundinput-${id}`);
   if (input) input.value = name;
+};
+
+window.crAddAltFund = function(rowId) {
+  const r = crFunds.find(x => x.id === rowId);
+  if (!r) return;
+  if (!r.altFunds) r.altFunds = [];
+  r.altFunds.push(crDefaultAltFund());
+  crRenderRows();
+};
+
+window.crRemoveAltFund = function(rowId, altId) {
+  const r = crFunds.find(x => x.id === rowId);
+  if (!r) return;
+  r.altFunds = (r.altFunds || []).filter(a => a.id !== altId);
+  crRenderRows();
+};
+
+window.crUpdateAltField = function(rowId, altId, field, val) {
+  const r = crFunds.find(x => x.id === rowId);
+  if (!r) return;
+  const a = (r.altFunds || []).find(x => x.id === altId);
+  if (a) a[field] = val;
+};
+
+window.crOnAltFundInput = function(rowId, altId, val) {
+  const r = crFunds.find(x => x.id === rowId);
+  if (!r) return;
+  const a = (r.altFunds || []).find(x => x.id === altId);
+  if (a) { a.code = ''; a.name = val; a.ter = null; a.terConfidence = null; a.terStale = false; }
+  const timerKey = `alt-${rowId}-${altId}`;
+  const res = document.getElementById(`cr-altfundres-${rowId}-${altId}`);
+  if (!res) return;
+  clearTimeout(crTimers[timerKey]);
+  if (val.trim().length < 2) { res.style.display = 'none'; return; }
+  crTimers[timerKey] = setTimeout(async () => {
+    const results = await searchFunds(val.trim());
+    if (!results.length) { res.style.display = 'none'; return; }
+    res.innerHTML = results.map(rr => `
+      <div class="search-result-item" onmousedown="crSelectAltFund(${rowId},${altId},'${rr.schemeCode}',\`${rr.schemeName.replace(/`/g, "'")}\`)">
+        <div class="result-name">${rr.schemeName}</div>
+        <div class="result-meta">${rr.schemeCode}</div>
+      </div>`).join('');
+    res.style.display = 'block';
+  }, 300);
+};
+
+window.crSelectAltFund = async function(rowId, altId, code, name) {
+  const r = crFunds.find(x => x.id === rowId);
+  if (!r) return;
+  const a = (r.altFunds || []).find(x => x.id === altId);
+  if (!a) return;
+  a.code = code; a.name = name;
+  try {
+    const terResult = await getTER(name);
+    if (terResult && !terResult.unreachable) {
+      a.ter = terResult.regularTER;
+      a.terConfidence = terResult.confidence;
+      a.terStale = !!terResult.stale;
+    } else {
+      a.ter = null;
+    }
+  } catch (e) { a.ter = null; }
+  crRenderRows();
 };
 
 window.crGenerateReport = function() {
@@ -2954,6 +3109,12 @@ window.crGenerateReport = function() {
           <tr><td style="padding:2px 0;">Exit Load</td><td style="text-align:right;">${f.exitLoad || '—'}</td></tr>
           <tr><td style="padding:2px 0;">Lock-In</td><td style="text-align:right;">${f.lockIn || '—'}</td></tr>
         </table>
+        ${(() => {
+          const alts = (f.altFunds || []).filter(a => a.name && a.ter != null);
+          if (!alts.length) return '';
+          const items = alts.map(a => `${a.name} — Expense ratio ${(+a.ter).toFixed(2)}%${(a.brokerage !== '' && a.brokerage != null && !isNaN(a.brokerage)) ? ', ' + parseFloat(a.brokerage).toFixed(2) + '% paid to VED' : ''}`).join('; ');
+          return `<div style="margin-top:8px;font-size:10.5px;color:#555;font-style:italic;">(We also recommend the following alternative${alts.length > 1 ? 's' : ''} in this category: ${items})</div>`;
+        })()}
         ${f.reason ? `<div style="margin-top:8px;font-size:11px;color:#333;line-height:1.5;"><strong>Reason for selection:</strong> ${f.reason}</div>` : ''}
       </div>`;
   }).join('');
