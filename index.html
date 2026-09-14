@@ -3123,9 +3123,9 @@ window.crGenerateReport = function() {
   }).join('');
 
   const allocTree = validFunds.map(f => `
-    <div style="text-align:center;flex:1;min-width:120px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid #eee;">
       <div style="font-size:13px;color:#333;">${f.name}</div>
-      <div style="font-weight:700;font-size:14px;color:#111;">₹${(parseFloat(f.amount) || 0).toLocaleString('en-IN')}</div>
+      <div style="font-weight:700;font-size:14px;color:#111;white-space:nowrap;padding-left:14px;">₹${(parseFloat(f.amount) || 0).toLocaleString('en-IN')}</div>
     </div>`).join('');
 
   document.getElementById('crPreview').innerHTML = `
@@ -3138,9 +3138,12 @@ window.crGenerateReport = function() {
         Thank you for choosing VED as your preferred investment partner. We are committed to providing you with unbiased and ethical services, staying true to our principles for you and all our clients.
       </div>
       <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:8px;">Details of your investment${clientName ? ' — ' + clientName : ''}${can ? ' (' + can + ')' : ''}:</div>
-      <div style="display:flex;justify-content:center;gap:18px;flex-wrap:wrap;padding:12px 0 18px;border-bottom:1px solid #ddd;margin-bottom:18px;">
+      <div style="padding:4px 0 4px;margin-bottom:18px;">
         ${allocTree}
-        <div style="text-align:center;flex:1;min-width:120px;"><div style="font-size:13px;color:#666;">Total</div><div style="font-weight:800;font-size:15px;color:#111;">₹${total.toLocaleString('en-IN')}</div></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0 0;border-top:1.5px solid #ccc;margin-top:2px;">
+          <div style="font-size:13px;font-weight:700;color:#111;">Total</div>
+          <div style="font-weight:800;font-size:15px;color:#111;white-space:nowrap;padding-left:14px;">₹${total.toLocaleString('en-IN')}</div>
+        </div>
       </div>
       ${conversation ? `<div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">As Per Our Conversation:</div><div style="font-size:13px;color:#333;line-height:1.6;margin-bottom:18px;">${conversation}</div>` : ''}
       ${thoughtProcess ? `<div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">My Thought Process About Your Portfolio:</div><div style="font-size:13px;color:#333;line-height:1.6;margin-bottom:18px;">${thoughtProcess}</div>` : ''}
@@ -5224,6 +5227,7 @@ const BENCH_CODES = {
   '147622': 'Motilal Oswal Nifty Midcap 150 Direct',
   '118778': 'Nippon India Nifty Smallcap 250 Direct',
   '149343': 'Edelweiss Nifty LargeMidcap 250 Direct',
+  '147666': 'Axis Nifty 100 Index Direct Growth',
 };
 
 // State for each calc page
@@ -5890,6 +5894,7 @@ window._selectRollingBench = function(code, name) {
 // ─── SHARED BENCHMARK PILLS ──────────────────────────────
 const SHARED_BENCH_PILLS = [
   { label:'Nifty 50',        code:'120716' },
+  { label:'Nifty 100',       code:'147666' },
   { label:'Nifty 500',       code:'120503' },
   { label:'Nifty Next 50',   code:'143341' },
   { label:'Midcap 150',      code:'147622' },
@@ -6561,7 +6566,12 @@ function detectPlanType(name, schemeCode) {
   const n = name.toLowerCase();
   const hasDirect  = /\bdirect\b/.test(n);
   const hasRegular = /\bregular\b/.test(n);
-  const isIDCW  = n.includes('idcw') || n.includes('dividend');
+  // Strip the "dividend yield" category name before checking for actual
+  // IDCW/dividend-option markers — otherwise every fund in that category
+  // gets misclassified as an IDCW-option variant just for having "dividend
+  // yield" in its own category name, even genuine Growth options.
+  const optionCheck = n.replace(/dividend yield/g, '');
+  const isIDCW  = optionCheck.includes('idcw') || optionCheck.includes('dividend');
   const isBonus = /\bbonus\b/.test(n);
   // Previously this defaulted to 'regular_growth' whenever "direct" wasn't
   // found in the name — silently misclassifying any fund whose source-data
@@ -7192,7 +7202,13 @@ window.loadCategoryFunds = async function() {
   const planMatches = f => {
     const n = f.schemeName.toLowerCase();
     const isDirect = n.includes('direct');
-    const isIDCW = n.includes('idcw') || n.includes('dividend');
+    // Strip the category name itself before checking for IDCW/dividend
+    // option markers — otherwise every "Dividend Yield" fund gets
+    // misclassified as an IDCW-option variant just for containing the
+    // words "dividend yield" in its category name, even genuine Growth
+    // options.
+    const optionCheck = n.replace(/dividend yield/g, '');
+    const isIDCW = optionCheck.includes('idcw') || optionCheck.includes('dividend');
     let pt = isDirect && isIDCW ? 'direct_idcw' : !isDirect && isIDCW ? 'regular_idcw' : isDirect ? 'direct_growth' : 'regular_growth';
     return plan === 'all' || pt === plan;
   };
@@ -9536,9 +9552,16 @@ window.runCSR = async function() {
   const excludeTerms = CAT_EXCLUDE[catKeyword] || [];
   const matchTerms   = CAT_ALIASES[catKeyword] || [catKeyword];
 
-  // For income plus arbitrage, FOF structures are the norm — don't exclude them
+  // For income plus arbitrage, FOF structures are the norm — don't exclude them.
+  // For dividend yield, the bare 'dividend' exclude term (meant to filter out
+  // IDCW/dividend-option plan variants) also matches the category name itself
+  // ("XYZ Dividend Yield Fund"), so it was silently excluding every fund in
+  // this category. 'idcw' and 'payout' still catch the actual non-growth
+  // option variants, so dropping just 'dividend' here is safe.
   const alwaysExclude = catKeyword === 'income plus arbitrage'
     ? ALWAYS_EXCLUDE.filter(e => e !== 'fund of fund' && e !== ' fof ' && e !== 'feeder')
+    : catKeyword === 'dividend yield'
+    ? ALWAYS_EXCLUDE.filter(e => e !== 'dividend')
     : ALWAYS_EXCLUDE;
 
   let funds = allFunds
@@ -10608,6 +10631,7 @@ setTimeout(() => { swpRenderBuckets(); }, 750);
 
 const WL_BENCH_PILLS = [
   { label:'Nifty 50',        code:'120716' },
+  { label:'Nifty 100',       code:'147666' },
   { label:'Nifty 500',       code:'120503' },
   { label:'Nifty Next 50',   code:'143341' },
   { label:'Midcap 150',      code:'147622' },
