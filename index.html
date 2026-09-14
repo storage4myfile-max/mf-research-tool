@@ -1278,15 +1278,7 @@
           <!-- Row 2: Benchmark -->
           <div style="margin-bottom:16px;">
             <label class="input-label">Benchmark for Alpha</label>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;margin-bottom:8px;">
-              <button id="csrpill-0" onclick="window._csrSelectPill(0)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">Nifty 50</button>
-              <button id="csrpill-1" onclick="window._csrSelectPill(1)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">Nifty 500</button>
-              <button id="csrpill-2" onclick="window._csrSelectPill(2)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">Nifty Next 50</button>
-              <button id="csrpill-3" onclick="window._csrSelectPill(3)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">Midcap 150</button>
-              <button id="csrpill-4" onclick="window._csrSelectPill(4)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">Smallcap 250</button>
-              <button id="csrpill-5" onclick="window._csrSelectPill(5)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">LargeMidcap 250</button>
-              <button id="csrpill-6" onclick="window._csrSelectPill(6)" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">N500 Multicap</button>
-            </div>
+            <div id="csr-pill-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;margin-bottom:8px;"></div>
             <div style="font-size:10px;font-family:var(--mono);color:var(--accent);min-height:14px;" id="csr-bench-label"></div>
           </div>
 
@@ -9482,6 +9474,17 @@ setVal('chartTo', todayStr);
 let _csrBenchCode = null;
 let _csrBenchName = null;
 
+// Renders the benchmark pill row from SHARED_BENCH_PILLS so it can never
+// drift out of sync with that array again — this used to be a hand-written
+// static button list with hardcoded indices, which silently broke (wrong
+// benchmark selected, missing pills) any time SHARED_BENCH_PILLS changed.
+function _csrRenderPills() {
+  const row = document.getElementById('csr-pill-row');
+  if (!row) return;
+  row.innerHTML = SHARED_BENCH_PILLS.map((p, i) => `
+    <button id="csrpill-${i}" onclick="window._csrSelectPill(${i})" style="padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);transition:all 0.15s;">${p.label}</button>`).join('');
+}
+
 window._csrSelectPill = function(idx) {
   const p = SHARED_BENCH_PILLS[idx];
   _csrBenchCode = p.code;
@@ -9498,6 +9501,7 @@ window._csrSelectPill = function(idx) {
   const lbl = document.getElementById('csr-bench-label');
   if (lbl) lbl.textContent = '✓ ' + p.label;
 };
+_csrRenderPills();
 
 window.runCSR = async function() {
   const catKeyword = document.getElementById('csr-category')?.value;
