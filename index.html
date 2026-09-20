@@ -11807,6 +11807,8 @@ window.runCPTPR = async function() {
   const matchTerms   = CAT_ALIASES_L[catVal]  || [catVal];
   const alwaysEx     = catVal === 'income plus arbitrage'
     ? ALWAYS_EX.filter(e => e !== 'fund of fund' && e !== ' fof ' && e !== 'feeder')
+    : catVal === 'dividend yield'
+    ? ALWAYS_EX.filter(e => e !== 'dividend')
     : ALWAYS_EX;
 
   let funds = window.allFunds.filter(f => {
