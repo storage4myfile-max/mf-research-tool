@@ -5508,6 +5508,7 @@ window.calcSIP = async function() {
         const navArr = fData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
         const anomalies = computeNavAnomalies(navArr.filter(n=>n.date>=startD&&n.date<=endD), slot.name);
         const cf = buildSIPCashflows(navArr, startD, endD, amt, frequency);
+        if (!cf.length) throw new Error('No installments fall in this date range — try a wider range, or NAV for the most recent day may not be published yet');
         const xirr = calcXIRR(cf);
         const invested = cf.filter(c=>c.amount<0).length * amt;
         const finalVal = cf[cf.length-1].amount;
@@ -7635,7 +7636,7 @@ window.calcLumpSIP = async function() {
       const fData = await getNav(slot.code);
       const navArr = fData.data.map(n=>({date:parseDate(n.date),nav:parseFloat(n.nav)})).filter(n=>!isNaN(n.nav)).reverse();
       const cf = buildCustomCF(navArr, activeLumps, activeLegs, valDate);
-      if (!cf) throw new Error('No valid cashflows generated');
+      if (!cf || !cf.length) throw new Error('No valid cashflows generated — check the dates, or NAV for the most recent day may not be published yet');
       const invested  = Math.abs(cf.filter(c=>c.amount<0).reduce((s,c)=>s+c.amount,0));
       const finalVal  = cf[cf.length-1].amount;
       const xirr      = calcXIRR(cf);
@@ -11845,7 +11846,7 @@ window.runCPTPR = async function() {
   // Process funds in parallel batches of 15
   const results = [];
   const BATCH = 15;
-  let done = 0;
+  let done = 0, fetchErrCount = 0, noRangeDataCount = 0, lastErr = null;
   for (let i = 0; i < funds.length; i += BATCH) {
     const batch = funds.slice(i, i + BATCH);
     await Promise.allSettled(batch.map(async f => {
@@ -11857,11 +11858,32 @@ window.runCPTPR = async function() {
           const alpha = benchReturn ? ret.pct - benchReturn.pct : null;
           const finalVal = amt * (ret.sNav > 0 ? ret.eNav / ret.sNav : 1);
           results.push({ name: f.schemeName, code: f.schemeCode, ...ret, alpha, finalVal });
+        } else {
+          noRangeDataCount++;
         }
-      } catch(e) {}
+      } catch(e) { fetchErrCount++; lastErr = e?.message || String(e); }
       done++;
     }));
     statusEl.textContent = `Processing ${Math.min(done, funds.length)} / ${funds.length} funds…`;
+  }
+
+  // funds.length was nonzero, but if nothing came out the other end, the old
+  // code silently rendered an empty "0 funds ranked" table with zero clue
+  // why — every per-fund failure (network error or no NAV in this exact
+  // range) was swallowed by an empty catch block. Surface the actual
+  // breakdown instead, so this is diagnosable rather than a mystery.
+  if (!results.length) {
+    const reasonParts = [];
+    if (fetchErrCount)     reasonParts.push(`${fetchErrCount} fund${fetchErrCount>1?'s':''} failed to load NAV data${lastErr ? ' (' + lastErr + ')' : ''}`);
+    if (noRangeDataCount)  reasonParts.push(`${noRangeDataCount} fund${noRangeDataCount>1?'s':''} had no NAV data covering this exact date range`);
+    resultEl.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:11px;padding:16px;line-height:1.7;">
+      ${funds.length} fund${funds.length>1?'s':''} matched "${catVal}" (${plan === 'direct_growth' ? 'Direct Growth' : 'Regular Growth'}), but none produced a result.<br>
+      ${reasonParts.join('<br>')}
+      ${noRangeDataCount ? '<br><br>Try a slightly wider date range — NAV for the most recent day or two may not be published yet.' : ''}
+      ${fetchErrCount ? '<br><br>Check the API Status page, or try again in a moment.' : ''}
+    </div>`;
+    statusEl.textContent = '';
+    return;
   }
 
   results.sort((a, b) => b.pct - a.pct);
