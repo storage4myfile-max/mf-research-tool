@@ -3573,8 +3573,21 @@ function _widenForCapture(el) {
     target.style.overflow = 'visible';
     target.style.width = target.scrollWidth + 'px';
   };
+  // Widen scrollable descendants first (e.g. .compare-table-wrap from resultsTable())
+  // so their full content width is established before anything above them is measured.
+  el.querySelectorAll('.compare-table-wrap').forEach(widen);
+
+  // Widen `el` itself. `el` is normally a plain block container (e.g.
+  // #sipcalc-snapshot) which does NOT grow to fit an overflowing child even
+  // after that child is widened above — it's html2canvas's actual capture
+  // target, so if it stays at its original width the capture still clips at
+  // that edge, cutting off whichever column ends up poking out (in practice,
+  // always the rightmost one — e.g. the Alpha column in SIP/PTP comparisons).
+  widen(el);
+
   // Walk up a few levels for scrollable ancestors (e.g. CSR's #csr-snapshot-wrap,
-  // which uses an inline overflow-x:auto style rather than the shared class).
+  // which uses an inline overflow-x:auto style rather than the shared class),
+  // widening each in turn now that everything below it has its full size.
   let node = el.parentElement, hops = 0;
   while (node && hops < 6) {
     const cs = getComputedStyle(node);
@@ -3582,8 +3595,6 @@ function _widenForCapture(el) {
     node = node.parentElement;
     hops++;
   }
-  // Widen any scrollable descendants too (e.g. .compare-table-wrap from resultsTable()).
-  el.querySelectorAll('.compare-table-wrap').forEach(widen);
 
   const bodyOverflow = document.body.style.overflow;
   document.body.style.overflow = 'visible';
