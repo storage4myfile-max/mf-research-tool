@@ -9771,13 +9771,18 @@ window.runCSR = async function() {
   };
 
   const avgAlphaCol = avgAlpha !== null ? (avgAlpha > 0 ? 'var(--positive)' : avgAlpha < 0 ? 'var(--negative)' : 'var(--text3)') : 'var(--text3)';
+  // Value and Gain must derive their sign/colour from the actual numbers, exactly
+  // like every per-fund row does (r.worth > r.invested / r.gain >= 0) — this row
+  // previously hardcoded both to green/"+" regardless of avgWorth vs avgInvested.
+  const avgWorthCol = avgWorth > avgInvested ? 'var(--positive)' : 'var(--negative)';
+  const avgGainCol  = avgGain >= 0 ? 'var(--positive)' : 'var(--negative)';
   const avgRow = `<tr style="background:rgba(255,255,255,0.03);">
     <td style="${tdSt}text-align:center;color:var(--text3);">—</td>
     <td style="${tdStL}font-style:italic;font-weight:600;color:var(--text);">Category Average (${results.length} funds)</td>
     <td style="${tdSt}font-weight:700;color:var(--accent);">${avgXIRR.toFixed(2)}%</td>
     <td style="${tdSt}color:var(--text3);">₹${fmtA(avgInvested)}</td>
-    <td style="${tdSt}font-weight:600;color:var(--positive);">₹${fmtA(avgWorth)}</td>
-    <td style="${tdSt}color:var(--positive);">+₹${fmtA(Math.abs(avgGain))}</td>
+    <td style="${tdSt}font-weight:600;color:${avgWorthCol};">₹${fmtA(avgWorth)}</td>
+    <td style="${tdSt}color:${avgGainCol};">${avgGain>=0?'+':'−'}₹${fmtA(Math.abs(avgGain))}</td>
     <td style="${tdSt}color:var(--text3);">—</td>
     ${hasBench ? `<td style="${tdSt}font-weight:700;color:${avgAlphaCol};">${avgAlpha !== null ? (avgAlpha>0?'+':'')+avgAlpha.toFixed(2)+'%' : '—'}</td>` : ''}
   </tr>`;
@@ -11858,6 +11863,7 @@ window.runCPTPR = async function() {
   const results = [];
   const BATCH = 15;
   let done = 0, fetchErrCount = 0, noRangeDataCount = 0, lastErr = null;
+  const noRangeDataNames = [], fetchErrNames = [];
   for (let i = 0; i < funds.length; i += BATCH) {
     const batch = funds.slice(i, i + BATCH);
     await Promise.allSettled(batch.map(async f => {
@@ -11871,8 +11877,9 @@ window.runCPTPR = async function() {
           results.push({ name: f.schemeName, code: f.schemeCode, ...ret, alpha, finalVal });
         } else {
           noRangeDataCount++;
+          noRangeDataNames.push(f.schemeName);
         }
-      } catch(e) { fetchErrCount++; lastErr = e?.message || String(e); }
+      } catch(e) { fetchErrCount++; lastErr = e?.message || String(e); fetchErrNames.push(f.schemeName); }
       done++;
     }));
     statusEl.textContent = `Processing ${Math.min(done, funds.length)} / ${funds.length} funds…`;
@@ -11899,12 +11906,12 @@ window.runCPTPR = async function() {
 
   results.sort((a, b) => b.pct - a.pct);
   const periodLabel = (custS && custE) ? 'Custom' : asOnVal ? `${_cptprPeriod} (As On ${new Date(asOnVal).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})})` : _cptprPeriod;
-  _cptprResults = { results, benchReturn, catVal, plan, amt, startDate, endDate, period: _cptprPeriod, periodLabel, benchName: _cptprBenchName, cptprAmbiguousCount, cptprBonusCount };
+  _cptprResults = { results, benchReturn, catVal, plan, amt, startDate, endDate, period: _cptprPeriod, periodLabel, benchName: _cptprBenchName, cptprAmbiguousCount, cptprBonusCount, noRangeDataNames, fetchErrNames };
   statusEl.textContent = `✓ ${results.length} funds ranked`;
   cptprRenderResults(_cptprResults);
 };
 
-function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate, endDate, period, periodLabel, benchName, cptprAmbiguousCount = 0, cptprBonusCount = 0 }) {
+function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate, endDate, period, periodLabel, benchName, cptprAmbiguousCount = 0, cptprBonusCount = 0, noRangeDataNames = [], fetchErrNames = [] }) {
   const resultEl = document.getElementById('cptprResult');
   if (!resultEl) return;
 
@@ -11977,6 +11984,8 @@ function cptprRenderResults({ results, benchReturn, catVal, plan, amt, startDate
         * CAGR for ≥1Y · Absolute for &lt;1Y · Value = ₹${(amt/1000).toFixed(0)}K invested at start NAV · Alpha = Fund% − Bench%
         ${cptprAmbiguousCount > 0 ? `<br>* ${cptprAmbiguousCount} fund${cptprAmbiguousCount>1?'s':''} in this category ${cptprAmbiguousCount>1?'were':'was'} excluded — their scheme name doesn't clearly state Direct or Regular, so plan type couldn't be reliably determined.` : ''}
         ${cptprBonusCount > 0 ? `<br>* ${cptprBonusCount} Bonus-plan fund${cptprBonusCount>1?'s':''} in this category ${cptprBonusCount>1?'were':'was'} excluded — Bonus plans issue bonus units instead of compounding NAV like Growth plans, so ${cptprBonusCount>1?'they are':'it is'} not directly comparable here.` : ''}
+        ${noRangeDataNames.length > 0 ? `<br>* ${noRangeDataNames.length} fund${noRangeDataNames.length>1?'s':''} matched "${catVal}" but had no NAV data covering this exact date range (likely launched after the start date) — excluded: ${noRangeDataNames.join(', ')}` : ''}
+        ${fetchErrNames.length > 0 ? `<br>* ${fetchErrNames.length} fund${fetchErrNames.length>1?'s':''} matched "${catVal}" but failed to load NAV data — excluded: ${fetchErrNames.join(', ')}` : ''}
       </span>
     </div>
   </div>`;
