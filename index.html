@@ -10788,6 +10788,28 @@ function calc1DayAsOf(navArr, asOfDate) {
   return { nav: endNav.nav, prevNav: prevNav.nav, pct, date: endNav.date };
 }
 
+// Return % from the nearest available NAV on/before `fromDate` to the nearest
+// available NAV on/before `asOfDate`. Used for YTD (FY-basis) and CY
+// (calendar-basis) columns in the Watchlist Monitor — same "nearest prior
+// trading day" tolerance as calc1DayAsOf, so weekends/holidays near either
+// boundary don't just return null. Returns null if the fund has no NAV on or
+// before fromDate (e.g. launched after the FY/CY start).
+function calcReturnSince(navArr, fromDate, asOfDate) {
+  if (!navArr || !navArr.length || !fromDate || !asOfDate) return null;
+  const toT = asOfDate.getTime();
+  let endIdx = -1;
+  for (let i = navArr.length - 1; i >= 0; i--) { if (navArr[i].date.getTime() <= toT) { endIdx = i; break; } }
+  if (endIdx < 0) return null;
+  const fromT = fromDate.getTime();
+  let startIdx = -1;
+  for (let i = 0; i <= endIdx; i++) { if (navArr[i].date.getTime() <= fromT) startIdx = i; else break; }
+  if (startIdx < 0) return null;
+  const startNav = navArr[startIdx], endNav = navArr[endIdx];
+  if (!startNav?.nav || !endNav?.nav) return null;
+  const pct = ((endNav.nav - startNav.nav) / startNav.nav) * 100;
+  return { pct, startDate: startNav.date, endDate: endNav.date };
+}
+
 async function loadWatchlistMonitor() {
   const ct = document.getElementById('compareTable');
   if (!ct) return;
@@ -10834,21 +10856,39 @@ async function loadWatchlistMonitor() {
         <span style="color:var(--warn);font-size:16px;line-height:1;">⚠</span>
         <div>
           <div style="color:var(--warn);font-weight:600;margin-bottom:4px;">${fundFailed.length + benchFailed.length} item${(fundFailed.length+benchFailed.length)>1?'s':''} failed to load</div>
-          <div style="color:var(--text3);line-height:1.5;">Likely a slow/interrupted connection, not a data problem — ${fundFailed.map(f=>f.schemeName).join(', ')}${fundFailed.length&&benchFailed.length?', ':''}${benchFailed.length?benchFailed.length+' benchmark(s)':''} showed "—" below. Refresh the page to retry.</div>
+          <div style="color:var(--text2);line-height:1.5;">Likely a slow/interrupted connection, not a data problem — ${fundFailed.map(f=>f.schemeName).join(', ')}${fundFailed.length&&benchFailed.length?', ':''}${benchFailed.length?benchFailed.length+' benchmark(s)':''} showed "—" below. Refresh the page to retry.</div>
         </div>
       </div>` : '';
 
     const now = new Date();
     const fmtDate = d => d ? d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : '—';
 
-    const thS = 'padding:8px 10px;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border2);background:var(--surface3);text-align:right;white-space:nowrap;';
+    const thS = 'padding:8px 10px;font-family:var(--mono);font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border2);background:var(--surface3);text-align:right;white-space:nowrap;';
     const tdS = 'padding:8px 10px;font-family:var(--mono);font-size:11px;color:var(--text);text-align:right;border-bottom:1px solid #1a1f2a;white-space:nowrap;';
+    // var(--text3) (#3a4a60) is a dark slate-blue that's very low-contrast
+    // against this table's near-black backgrounds (#080b12 / #131922) —
+    // basically illegible. var(--text2) (#7a8fa8) is the muted colour used
+    // everywhere else in this table (e.g. the benchmark label) and reads
+    // clearly against both, so it replaces var(--text3) throughout this
+    // table for the "#", scheme code, As Of, remove-button and footer text.
+    const mutedCol = 'var(--text2)';
+
+    // YTD = Indian FY-to-date (from the most recent 1 April); CY = calendar
+    // year-to-date (from 1 January) — distinct, commonly-used conventions,
+    // so both are offered rather than guessing which one "YTD" means here.
+    const fyStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const ytdStart = new Date(fyStartYear, 3, 1);
+    const cyStart  = new Date(now.getFullYear(), 0, 1);
 
     const hdrs = [
       `<th style="${thS}text-align:left;">#</th>`,
       `<th style="${thS}text-align:left;">Fund</th>`,
       `<th style="${thS}">NAV</th>`,
       `<th style="${thS}">1D NAV Δ</th>`,
+      `<th style="${thS}" title="FY-to-date, from 1 Apr ${fyStartYear}">YTD</th>`,
+      `<th style="${thS}" title="YTD Fund% − YTD Benchmark%">YTD Alpha</th>`,
+      `<th style="${thS}" title="Calendar-year-to-date, from 1 Jan ${cyStart.getFullYear()}">CY</th>`,
+      `<th style="${thS}" title="CY Fund% − CY Benchmark%">CY Alpha</th>`,
       `<th style="${thS}text-align:left;">Benchmark</th>`,
       `<th style="${thS}">Bench Δ</th>`,
       `<th style="${thS}">Alpha</th>`,
@@ -10861,17 +10901,41 @@ async function loadWatchlistMonitor() {
       const f1d  = calc1Day(fNav);
       const bNav = f.benchCode ? benchNav[f.benchCode] : null;
       const b1d  = (bNav && f1d) ? calc1DayAsOf(bNav, f1d.date) : null;
+      const asOfDate = f1d ? f1d.date : now;
+      const fYtd = calcReturnSince(fNav, ytdStart, asOfDate);
+      const fCy  = calcReturnSince(fNav, cyStart,  asOfDate);
+      // Benchmark YTD/CY anchored to the same asOfDate as the fund's own
+      // figures (same reasoning as calc1DayAsOf for the 1D column) so
+      // fund-vs-benchmark alpha compares the same calendar window.
+      const bYtd = bNav ? calcReturnSince(bNav, ytdStart, asOfDate) : null;
+      const bCy  = bNav ? calcReturnSince(bNav, cyStart,  asOfDate) : null;
 
       const fPctStr  = f1d  ? `${f1d.pct  > 0 ? '+' : ''}${f1d.pct.toFixed(3)}%`  : '—';
       const bPctStr  = b1d  ? `${b1d.pct  > 0 ? '+' : ''}${b1d.pct.toFixed(3)}%`  : '—';
-      const fColor   = f1d  ? (f1d.pct  > 0 ? '#2dd4a0' : f1d.pct  < 0 ? '#f05c78' : 'var(--text)') : 'var(--text3)';
-      const bColor   = b1d  ? (b1d.pct  > 0 ? '#2dd4a0' : b1d.pct  < 0 ? '#f05c78' : 'var(--text)') : 'var(--text3)';
+      const ytdStr   = fYtd ? `${fYtd.pct > 0 ? '+' : ''}${fYtd.pct.toFixed(2)}%` : '—';
+      const cyStr    = fCy  ? `${fCy.pct  > 0 ? '+' : ''}${fCy.pct.toFixed(2)}%`  : '—';
+      const fColor   = f1d  ? (f1d.pct  > 0 ? '#2dd4a0' : f1d.pct  < 0 ? '#f05c78' : 'var(--text)') : mutedCol;
+      const bColor   = b1d  ? (b1d.pct  > 0 ? '#2dd4a0' : b1d.pct  < 0 ? '#f05c78' : 'var(--text)') : mutedCol;
+      const ytdColor = fYtd ? (fYtd.pct > 0 ? '#2dd4a0' : fYtd.pct < 0 ? '#f05c78' : 'var(--text)') : mutedCol;
+      const cyColor  = fCy  ? (fCy.pct  > 0 ? '#2dd4a0' : fCy.pct  < 0 ? '#f05c78' : 'var(--text)') : mutedCol;
 
-      let alphaStr = '—', alphaColor = 'var(--text3)';
+      let alphaStr = '—', alphaColor = mutedCol;
       if (f1d && b1d) {
         const alpha = f1d.pct - b1d.pct;
         alphaStr  = `${alpha > 0 ? '+' : ''}${alpha.toFixed(3)}%`;
         alphaColor = alpha > 0 ? '#2dd4a0' : alpha < 0 ? '#f05c78' : 'var(--text)';
+      }
+      let ytdAlphaStr = '—', ytdAlphaColor = mutedCol;
+      if (fYtd && bYtd) {
+        const a = fYtd.pct - bYtd.pct;
+        ytdAlphaStr = `${a > 0 ? '+' : ''}${a.toFixed(2)}%`;
+        ytdAlphaColor = a > 0 ? '#2dd4a0' : a < 0 ? '#f05c78' : 'var(--text)';
+      }
+      let cyAlphaStr = '—', cyAlphaColor = mutedCol;
+      if (fCy && bCy) {
+        const a = fCy.pct - bCy.pct;
+        cyAlphaStr = `${a > 0 ? '+' : ''}${a.toFixed(2)}%`;
+        cyAlphaColor = a > 0 ? '#2dd4a0' : a < 0 ? '#f05c78' : 'var(--text)';
       }
 
       const navStr = f1d ? `₹${f1d.nav.toFixed(4)}` : '—';
@@ -10883,20 +10947,24 @@ async function loadWatchlistMonitor() {
       const escB = (f.benchName||'').replace(/`/g,"'");
       return `<tr style="${rowBg}cursor:pointer;"
         onclick="wlOpenFundDetail('${f.schemeCode}',\`${escN}\`,'${f.benchCode||''}',\`${escB}\`)">
-        <td style="${tdS}text-align:left;color:var(--text3);">${i+1}</td>
+        <td style="${tdS}text-align:left;color:${mutedCol};">${i+1}</td>
         <td style="${tdS}text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis;">
           <div style="font-size:11px;color:var(--text);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.schemeName}">${f.schemeName}</div>
-          <div style="font-size:9px;color:var(--text3);margin-top:1px;">${f.schemeCode}</div>
+          <div style="font-size:9px;color:${mutedCol};margin-top:1px;">${f.schemeCode}</div>
         </td>
         <td style="${tdS}">${navStr}</td>
         <td style="${tdS}font-weight:700;color:${fColor};">${fPctStr}</td>
+        <td style="${tdS}font-weight:700;color:${ytdColor};">${ytdStr}</td>
+        <td style="${tdS}color:${ytdAlphaColor};">${ytdAlphaStr}</td>
+        <td style="${tdS}font-weight:700;color:${cyColor};">${cyStr}</td>
+        <td style="${tdS}color:${cyAlphaColor};">${cyAlphaStr}</td>
         <td style="${tdS}text-align:left;font-size:10px;color:var(--text2);">${benchLabel}</td>
         <td style="${tdS}color:${bColor};">${bPctStr}</td>
         <td style="${tdS}font-weight:700;color:${alphaColor};">${alphaStr}</td>
-        <td style="${tdS}color:var(--text3);font-size:10px;">${asOf}</td>
+        <td style="${tdS}color:${mutedCol};font-size:10px;">${asOf}</td>
         <td style="${tdS}">
           <button onmousedown="confirmRemoveFromWatchlist('${f.schemeCode}',\`${escN}\`,event)"
-            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 6px;"
+            style="background:none;border:none;color:${mutedCol};cursor:pointer;font-size:12px;padding:2px 6px;"
             title="Remove">✕</button>
         </td>
       </tr>`;
@@ -10907,11 +10975,11 @@ async function loadWatchlistMonitor() {
     ct.innerHTML = addHTML + fetchWarnBanner + `
     <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;">
       <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border2);">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;">
           Daily NAV Monitor &nbsp;·&nbsp; <span style="color:var(--text2);">${items.length} fund${items.length!==1?'s':''}</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-family:var(--mono);font-size:9px;color:var(--text3);">Refreshed ${refreshedAt}</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--text2);">Refreshed ${refreshedAt}</span>
           <button class="btn btn-secondary" style="font-size:10px;padding:5px 12px;" onclick="loadWatchlistMonitor()">↻ Refresh</button>
         </div>
       </div>
@@ -10922,9 +10990,9 @@ async function loadWatchlistMonitor() {
         </table>
       </div>
       <div style="padding:8px 14px;border-top:1px solid var(--border2);">
-        <span style="font-family:var(--mono);font-size:9px;color:var(--text3);">
-          1D Δ = (latest NAV − previous NAV) / previous NAV × 100 &nbsp;·&nbsp; Alpha = Fund 1D% − Benchmark 1D%
-          &nbsp;·&nbsp; Green = outperform · Red = underperform
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text2);">
+          1D Δ = (latest NAV − previous NAV) / previous NAV × 100 &nbsp;·&nbsp; YTD = FY-to-date from 1 Apr ${fyStartYear} (absolute, not annualised) &nbsp;·&nbsp; CY = calendar-year-to-date from 1 Jan ${cyStart.getFullYear()} (absolute, not annualised)
+          &nbsp;·&nbsp; Alpha / YTD Alpha / CY Alpha = Fund% − Benchmark% over the matching window &nbsp;·&nbsp; Green = outperform / gain · Red = underperform / loss
         </span>
       </div>
     </div>`;
