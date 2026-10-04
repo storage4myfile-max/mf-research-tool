@@ -10884,14 +10884,12 @@ async function loadWatchlistMonitor() {
       `<th style="${thS}text-align:left;">#</th>`,
       `<th style="${thS}text-align:left;">Fund</th>`,
       `<th style="${thS}">NAV</th>`,
-      `<th style="${thS}">1D NAV Δ</th>`,
+      `<th style="${thS}" title="1D Fund% change">1D Δ</th>`,
+      `<th style="${thS}" title="1D Fund% − 1D Benchmark%">1D Alpha</th>`,
       `<th style="${thS}" title="FY-to-date, from 1 Apr ${fyStartYear}">YTD</th>`,
       `<th style="${thS}" title="YTD Fund% − YTD Benchmark%">YTD Alpha</th>`,
       `<th style="${thS}" title="Calendar-year-to-date, from 1 Jan ${cyStart.getFullYear()}">CY</th>`,
       `<th style="${thS}" title="CY Fund% − CY Benchmark%">CY Alpha</th>`,
-      `<th style="${thS}text-align:left;">Benchmark</th>`,
-      `<th style="${thS}">Bench Δ</th>`,
-      `<th style="${thS}">Alpha</th>`,
       `<th style="${thS}">As Of</th>`,
       `<th style="${thS}"></th>`,
     ].join('');
@@ -10911,11 +10909,9 @@ async function loadWatchlistMonitor() {
       const bCy  = bNav ? calcReturnSince(bNav, cyStart,  asOfDate) : null;
 
       const fPctStr  = f1d  ? `${f1d.pct  > 0 ? '+' : ''}${f1d.pct.toFixed(3)}%`  : '—';
-      const bPctStr  = b1d  ? `${b1d.pct  > 0 ? '+' : ''}${b1d.pct.toFixed(3)}%`  : '—';
       const ytdStr   = fYtd ? `${fYtd.pct > 0 ? '+' : ''}${fYtd.pct.toFixed(2)}%` : '—';
       const cyStr    = fCy  ? `${fCy.pct  > 0 ? '+' : ''}${fCy.pct.toFixed(2)}%`  : '—';
       const fColor   = f1d  ? (f1d.pct  > 0 ? '#2dd4a0' : f1d.pct  < 0 ? '#f05c78' : 'var(--text)') : mutedCol;
-      const bColor   = b1d  ? (b1d.pct  > 0 ? '#2dd4a0' : b1d.pct  < 0 ? '#f05c78' : 'var(--text)') : mutedCol;
       const ytdColor = fYtd ? (fYtd.pct > 0 ? '#2dd4a0' : fYtd.pct < 0 ? '#f05c78' : 'var(--text)') : mutedCol;
       const cyColor  = fCy  ? (fCy.pct  > 0 ? '#2dd4a0' : fCy.pct  < 0 ? '#f05c78' : 'var(--text)') : mutedCol;
 
@@ -10939,7 +10935,7 @@ async function loadWatchlistMonitor() {
       }
 
       const navStr = f1d ? `₹${f1d.nav.toFixed(4)}` : '—';
-      const benchLabel = f.benchName || (f.benchCode ? f.benchCode : '—');
+      const benchLabel = f.benchName || (f.benchCode ? f.benchCode : '');
       const asOf = f1d ? fmtDate(f1d.date) : '—';
       const rowBg = (i%2===0) ? '' : 'background:#0b0e16;';
 
@@ -10950,17 +10946,15 @@ async function loadWatchlistMonitor() {
         <td style="${tdS}text-align:left;color:${mutedCol};">${i+1}</td>
         <td style="${tdS}text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis;">
           <div style="font-size:11px;color:var(--text);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.schemeName}">${f.schemeName}</div>
-          <div style="font-size:9px;color:${mutedCol};margin-top:1px;">${f.schemeCode}</div>
+          <div style="font-size:9px;color:${mutedCol};margin-top:1px;">${f.schemeCode}${benchLabel ? ' · vs ' + benchLabel : ''}</div>
         </td>
         <td style="${tdS}">${navStr}</td>
         <td style="${tdS}font-weight:700;color:${fColor};">${fPctStr}</td>
+        <td style="${tdS}color:${alphaColor};">${alphaStr}</td>
         <td style="${tdS}font-weight:700;color:${ytdColor};">${ytdStr}</td>
         <td style="${tdS}color:${ytdAlphaColor};">${ytdAlphaStr}</td>
         <td style="${tdS}font-weight:700;color:${cyColor};">${cyStr}</td>
         <td style="${tdS}color:${cyAlphaColor};">${cyAlphaStr}</td>
-        <td style="${tdS}text-align:left;font-size:10px;color:var(--text2);">${benchLabel}</td>
-        <td style="${tdS}color:${bColor};">${bPctStr}</td>
-        <td style="${tdS}font-weight:700;color:${alphaColor};">${alphaStr}</td>
         <td style="${tdS}color:${mutedCol};font-size:10px;">${asOf}</td>
         <td style="${tdS}">
           <button onmousedown="confirmRemoveFromWatchlist('${f.schemeCode}',\`${escN}\`,event)"
@@ -10992,7 +10986,7 @@ async function loadWatchlistMonitor() {
       <div style="padding:8px 14px;border-top:1px solid var(--border2);">
         <span style="font-family:var(--mono);font-size:9px;color:var(--text2);">
           1D Δ = (latest NAV − previous NAV) / previous NAV × 100 &nbsp;·&nbsp; YTD = FY-to-date from 1 Apr ${fyStartYear} (absolute, not annualised) &nbsp;·&nbsp; CY = calendar-year-to-date from 1 Jan ${cyStart.getFullYear()} (absolute, not annualised)
-          &nbsp;·&nbsp; Alpha / YTD Alpha / CY Alpha = Fund% − Benchmark% over the matching window &nbsp;·&nbsp; Green = outperform / gain · Red = underperform / loss
+          &nbsp;·&nbsp; Alpha columns = Fund% − Benchmark% over the matching window (benchmark shown under each fund name) &nbsp;·&nbsp; Green = outperform / gain · Red = underperform / loss
         </span>
       </div>
     </div>`;
